@@ -36,9 +36,11 @@ zaw Provider 需提供：
 
 - zaw_workspace：Workspace ID、组织、Server URL 等上下文。
 - zaw_parameter：创建 Workspace 时 Workbench 展示的参数定义。
-- zaw_agent_host：Agent Host、ACP Agent、工具能力和运行时契约声明。
+- zaw_agent_host：Agent Host、Agent SDK、工具能力和运行时契约声明。
 
-模板不得写入长期 Server Token、Agent Host Token、SSH 私钥、云密钥或其他 Secret。Agent Host 使用 Provisioner 注入的工作负载身份注册，并换取短期凭据。
+模板不得写入全局 Server Token、SSH 私钥、云密钥或其他 Secret。Agent Host
+使用 Provisioner 注入且仅限单个 Workspace 的注册凭证，不增加 session token
+轮换协议。
 
 ## 参数类别
 
@@ -47,7 +49,7 @@ zaw Provider 需提供：
 | Workspace Parameter | Workspace 创建者 | CPU、内存、镜像、仓库 |
 | Preset | 模板管理员 | 标准 Go、GPU 大型 |
 | Template Variable | 模板/平台管理员 | 网络 ID、镜像仓库、云配置 |
-| Runtime Secret | Server/Secret Manager | Git Token、短期 Host 凭据 |
+| Runtime Secret | Server/Secret Manager | Git Token、Workspace 注册凭据 |
 
 Secret 不得进入 Terraform 明文参数、输出或 State。
 

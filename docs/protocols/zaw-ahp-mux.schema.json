@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zaw.dev/schema/ahp-mux.schema.json",
+  "title": "Zaw AHP Mux Frame",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "open" },
+        "streamId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["type", "streamId"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "opened" },
+        "streamId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["type", "streamId"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "data" },
+        "streamId": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object" }
+      },
+      "required": ["type", "streamId", "payload"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "close" },
+        "streamId": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" }
+      },
+      "required": ["type", "streamId"],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+.zaw-button {
+  display: inline-flex;
+  min-height: 25px;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  color: var(--zaw-foreground-muted);
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+
+  &:hover {
+    color: var(--zaw-foreground-strong);
+    background: var(--zaw-surface-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--zaw-focus-border);
+    outline-offset: -1px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  .codicon {
+    line-height: 1;
+  }
+}
+
+.zaw-button-primary,
+.primary-action {
+  color: var(--zaw-button-foreground);
+  background: var(--zaw-button-background);
+  border-color: var(--zaw-button-background);
+
+  &:hover {
+    color: var(--zaw-button-foreground);
+    background: var(--zaw-button-hover);
+    border-color: var(--zaw-button-hover);
+  }
+}

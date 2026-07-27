@@ -1,0 +1,19 @@
+.tool-event .tool-state {
+  margin-left: auto;
+  color: var(--zaw-description);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: capitalize;
+}
+
+.approval-event footer {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 9px;
+}
+
+.approval-state {
+  color: var(--zaw-description);
+  text-transform: capitalize;
+}

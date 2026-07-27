@@ -1,0 +1,18 @@
+{
+  "name": "zaw",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "dev": "pnpm --filter @zaw/browser dev",
+    "build": "pnpm -r build",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,scss}\" \"packages/**/*.{ts,tsx,scss}\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,scss}\" \"packages/**/*.{ts,tsx,scss}\"",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.54.1",
+    "prettier": "3.6.2"
+  }
+}

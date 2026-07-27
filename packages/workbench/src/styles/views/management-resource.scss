@@ -1,0 +1,73 @@
+.management-resource-view {
+  padding: 20px 24px;
+
+  > header,
+  .management-resource-card > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  h2 {
+    margin: 0 0 4px;
+    color: var(--zaw-foreground-strong);
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--zaw-description);
+  }
+}
+
+.management-resource-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.management-resource-card {
+  padding: 12px;
+  background: var(--zaw-surface-raised);
+  border: 1px solid var(--zaw-border);
+  border-radius: 5px;
+
+  header > div {
+    display: grid;
+    gap: 4px;
+  }
+
+  header > span {
+    display: flex;
+    gap: 4px;
+  }
+
+  small,
+  dt {
+    color: var(--zaw-description);
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: 100px minmax(0, 1fr);
+    gap: 5px 10px;
+    margin: 12px 0 0;
+  }
+
+  dd {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  pre {
+    margin: 12px 0 0;
+    overflow: auto;
+    color: var(--zaw-foreground-muted);
+    font: inherit;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+}

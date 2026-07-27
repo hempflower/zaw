@@ -1,0 +1,106 @@
+.terminal-panel {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  height: var(--zaw-terminal-panel-height, 300px);
+  min-height: 180px;
+  padding: 10px;
+  overflow: auto;
+  background: var(--zaw-surface);
+  border: 1px solid var(--zaw-border-strong);
+  border-radius: 7px;
+  box-shadow: 0 12px 40px var(--zaw-shadow);
+
+  header {
+    display: flex;
+    height: 27px;
+    gap: 5px;
+    align-items: center;
+  }
+  header h2 {
+    flex: 1;
+    margin: 0;
+    font-size: 12px;
+  }
+}
+
+.terminal-resize-handle {
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  right: 0;
+  left: 0;
+  height: 6px;
+  cursor: row-resize;
+
+  &:hover {
+    background: var(--zaw-focus-border);
+  }
+}
+
+body.bottom-panel-resizing {
+  cursor: row-resize;
+}
+
+.terminal-panel.collapsed {
+  min-height: 0;
+  height: 48px;
+
+  .terminal-resize-handle {
+    display: none;
+  }
+
+  .terminal-content {
+    display: none;
+  }
+}
+
+.terminal-content {
+  display: flex;
+  min-height: 180px;
+  gap: 10px;
+  align-items: center;
+}
+.terminal-content > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.terminal-content pre {
+  min-height: 136px;
+  max-height: 270px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  color: var(--zaw-terminal-foreground);
+  background: var(--zaw-terminal-background);
+  border: 1px solid var(--zaw-border);
+  white-space: pre-wrap;
+}
+
+.terminal-content label {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--zaw-foreground-muted);
+}
+.terminal-content input {
+  padding: 6px;
+  color: var(--zaw-foreground);
+  background: var(--zaw-workbench-background);
+  border: 1px solid var(--zaw-border-strong);
+}
+
+.terminal-content aside {
+  width: 150px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.terminal-tab {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}

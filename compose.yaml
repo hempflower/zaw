@@ -1,0 +1,42 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: zaw
+      MYSQL_USER: zaw
+      MYSQL_PASSWORD: zaw
+      MYSQL_ROOT_PASSWORD: root
+    ports: ["3306:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes: [mysql-data:/var/lib/mysql]
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: zawminio
+      MINIO_ROOT_PASSWORD: zawminio-local-only
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio-data:/data]
+  minio-init:
+    image: minio/mc:latest
+    depends_on: [minio]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 zawminio zawminio-local-only;
+        do sleep 1; done;
+        mc mb --ignore-existing local/zaw-terraform-state
+  openbao:
+    image: openbao/openbao:latest
+    command: server -dev -dev-root-token-id=zaw-local-only
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: zaw-local-only
+    cap_add: [IPC_LOCK]
+    ports: ["8200:8200"]
+volumes:
+  mysql-data:
+  minio-data:

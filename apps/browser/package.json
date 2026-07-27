@@ -1,0 +1,23 @@
+{
+  "name": "@zaw/browser",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@vscode/codicons": "0.0.36",
+    "@zaw/workbench": "workspace:*"
+  },
+  "devDependencies": {
+    "sass": "^1.102.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,113 +1,161 @@
 # Workbench 设计
 
+> 当前实现向本设计的迁移由
+> [Workbench 架构改造路线图](workbench-refactoring-roadmap.md) 跟踪。路线图中的
+> R12 完成前，统一 View Registry 不等价于完整的 Workbench 解耦。
+
 ## 原则
 
 - Workbench 是持续存在的应用壳，不使用传统页面跳转。
-- Browser 与 Electron 复用 packages/workbench。
-- Electron 只增加内置浏览器等原生增强；不运行 Workspace 本机 Shell。
-- 管理能力使用覆盖式 Surface、Quick Pick、Sheet 和 Dialog。
-- Esc 从最内层浮层逐级返回原 Session。
-- Workbench 以 Workspace → Session 为唯一主结构，不存在 Chats。
+- Browser 与 Electron 复用 `packages/workbench`。
+- Workbench 不使用 React，所有界面元素是 TypeScript class Widget。
+- InversifyJS 负责 Service、View、Widget 和 Part 的装配。
+- View 消费 Service，不直接访问 HTTP、WebSocket 或 AHP。
+- 一个窗口可展示多个 Workspace 的 Session，但同时只 attach 一个 Workspace。
+- 设置和管理能力使用 Workbench 内部浮动窗口。
+- Esc 从最内层 Dropdown/QuickPick/Dialog 逐级返回原 Session。
+
+## 工程结构
+
+```text
+src/
+├─ bootstrap/
+├─ services/
+├─ providers/
+├─ parts/
+├─ views/
+├─ widgets/
+└─ styles/
+```
+
+关键接口包括：
+
+- `ISessionCatalogService`
+- `IActiveSessionService`
+- `IWorkspaceAttachmentService`
+- `IWorkbenchConnection`
+- `ITerminalService`
+- `IChangesService`
+- `IFilesService`
+- `IThemeService`
+- `ILayoutService`
+- `IFloatingWindowService`
 
 ## 主布局
 
-~~~
+```text
 ┌───────────────┬───────────────────────────────────────┬──────────────┐
-│ 左侧栏         │ Session Canvas                        │ 右侧辅助栏    │
-│ Workspace      │ Session Header                        │ Changes       │
-│  └─ Session[]  │ Agent 事件流 + 输入框                 │ Files         │
-├───────────────┼───────────────────────────────────────┼──────────────┤
-│ 设置入口       │ Bottom Panel Host（Terminal）                        │
-└───────────────┴────────────────────────────────────────────────────┘
-~~~
+│ LeftSidebar   │ PrimaryArea                           │ SecondaryBar │
+│ Workspace[]   │ Active Session Canvas                 │ Changes      │
+│  └─ Session[] │ Agent 事件流 + 输入框                 │ Files        │
+├───────────────┴───────────────────────────────────────┴──────────────┤
+│ BottomPanel：Terminal                                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-## 左侧栏
+固定 Part：
 
-~~~
-会话                                      [+ New] [搜索]
+- `TitlebarPart`
+- `LeftSidebarPart`
+- `PrimaryAreaPart`
+- `BottomPanelPart`
+- `SecondarySidebarPart`
 
-● browser-js
-  ├─ 123
-  ├─ 修复登录超时
-  └─ 重构 API Client
+名称描述位置和用途。Terminal 是 `TerminalView`，注册到 BottomPanelPart；
+Changes 和 Files 是注册到 SecondarySidebarPart 的 View。
 
-● go-agent
-  └─ 初始化项目
+## 多 Workspace 与单 Attachment
 
-● node-dev
-  └─ 更新依赖
-~~~
+左栏通过 HTTP Session Catalog 展示多个 Workspace：
 
-- 绿点：该 Workspace 的 Agent Host 在线。
-- 红点：该 Workspace 的 Agent Host 离线。
-- 不显示“系统健康”“同步中”等泛化状态。
-- New 默认在当前 Workspace 创建 Session；未选 Workspace 时弹出 Workspace Quick Pick。
-- 离线 Workspace 的 Session 历史可浏览，但输入与终端不可执行。
+```text
+browser-js
+├─ 修复登录超时
+└─ Terraform Provider
+
+replay-ng
+└─ 重构认证流程  ← selected
+```
+
+选中 Session 使用复合身份：
+
+```text
+{ workspaceId, sessionResource }
+```
+
+- 同 Workspace 切换 Session：复用实时连接并调整 subscription。
+- 跨 Workspace 切换：释放旧 attachment，建立新 attachment。
+- 后台 Catalog 更新不能改变当前选中 Session。
+- 未 attach 的 Workspace 不创建完整实时订阅。
+- Host 离线时显示 last-known SessionSummary 和 stale 状态。
 
 ## Session Canvas
 
-Header 仅显示当前上下文：
+PrimaryArea 只显示当前 Session：
 
-~~~
-Session 名称
-[● Workspace] [Git 文件/变更统计] [CPU 12%] [Memory 2.1 / 8 GB]
-~~~
+- 用户和 Agent 消息。
+- 流式 response part。
+- 工具调用。
+- 审批请求。
+- 文件修改摘要。
+- 明确错误。
+- Agent、模型、附件和审批模式选择。
 
-Canvas 渲染用户消息、Agent 流、工具调用卡片、文件修改摘要、审批和明确错误。输入框位于底部，可就地选择 Agent、模型、附件和审批模式。
+## Secondary Sidebar
 
-## 右侧辅助栏
+Secondary Sidebar 使用可复用 TabsWidget：
 
-右栏只显示当前 Session 的辅助信息：
+- Changes：Session Changeset 和 Workspace uncommitted changes。
+- Files：Workspace 文件树和预览。
+- Browser：仅 Electron 的可选贡献。
 
-~~~
-[Changes] [Files] [Browser*]
-~~~
+支持关闭、宽度拖拽、多标签页和文件预览标签。
 
-- Changes：当前 Session 修改文件、diff 摘要、接受/还原操作。
-- Files：Workspace 文件树与文件预览入口。
-- Browser：仅 Electron 支持，用于预览 Workspace 暴露的 Web 服务或页面。
-- 右栏可关闭、可调整宽度。
+## Bottom Panel
 
-## 底部 Panel Host
+第一期只注册 TerminalView，不展示空功能标签：
 
-底部必须可扩展，但第一期只注册 Terminal，不展示空功能标签：
+- Terminal 属于 Workspace，可被同一 Workspace 的多个 Session 复用。
+- 创建、订阅、输入、输出、resize、detach 和 dispose 使用 AHP Terminal。
+- 面板可调整高度、折叠和关闭。
+- 关闭面板不销毁远程 Terminal。
+- 切回 Workspace 时重新 attach 仍存在的 Terminal。
 
-~~~
-┌────────────────────────────────────────────────────────────────────┐
-│ Terminal                                             [+] [···] [×] │
-├─────────────────────────────────────────────────┬──────────────────┤
-│ $ pwd                                           │ Agent Host 终端   │
-│ /workspace/browser-js                           │                  │
-│                                                 │ > pwsh           │
-│ $ git status                                    │   bash           │
-│                                                 │   dev-server     │
-└─────────────────────────────────────────────────┴──────────────────┘
-~~~
+## Widget 与主题
 
-- 左侧显示当前终端输入输出。
-- 右侧固定宽度、垂直排列该 Workspace 的 Agent Host 终端列表。
-- Terminal 属于 Workspace，可由同一 Workspace 的多个 Session 复用。
-- + 通过 AHP 在 Agent Host 中创建终端；输入、输出、resize、关闭均通过 AHP。
-- Browser 与 Electron 都渲染远程终端；Electron 不运行本机 Shell。
-- 面板可拖拽高度、折叠或关闭；关闭面板不销毁终端。
-- 后续可注册 output、tasks、ports、logs、debug 等贡献项。
+所有基础控件使用 class Widget，包括 Button、PrimaryButton、Input、Select、
+Radio、Checkbox、Tabs、Tree、Dialog、QuickPick 和 SplitView。
 
-~~~
-BottomPanelContribution {
-  id
-  title
-  render()
-}
-~~~
+- 每个 Widget/Part 使用独立 SCSS。
+- 使用 Codicon。
+- 图标和文本共享统一基线、间距和状态样式。
+- 所有颜色使用 token，支持 Dark、Light、High Contrast 和 System。
+- 主题通过 SelectWidget 选择。
 
-## Settings Surface
+## 浮动设置与管理窗口
 
-Template、Provisioner、系统凭证、MCP、插件等低频管理能力使用覆盖式 Settings Surface，不离开当前 Session：
+设置、Template、Credential、Workspace、Agent Host 和 Provisioner 管理使用：
 
-~~~
-Settings Surface → Workspace → Templates → Add Template
-                                      └─ Quick Pick: Git / Tar URL
-                                      └─ Sheet: 填写来源、目录、凭证
-~~~
+```text
+OverlayLayer
+└─ FloatingWindowWidget
+   └─ ManagementSurfaceWidget
+      ├─ Search
+      ├─ Scope Tabs
+      ├─ Navigation
+      └─ Content
+```
 
-保存后回到 Surface 列表，不改变当前 Session 或 Workspace 上下文。
+- 浮动窗口居中，可拖动、resize、最大化和恢复。
+- 背景变暗并 inert，关闭后恢复原焦点。
+- 管理窗口内部使用导航栈，不叠加第二个大型窗口。
+- 未保存内容关闭前必须确认。
+- 移动端占满 viewport，禁用拖动和 resize。
+
+## 响应式行为
+
+- Desktop 支持左右栏和 Bottom Panel 拖拽。
+- 标题栏可开关 LeftSidebar 和 SecondarySidebar。
+- 移动端面板通过点击弹出的全宽抽屉展示，不进行纵向堆叠。
+- 移动端管理窗口使用全屏模式。
+- Desktop、Tablet、Mobile 和所有主题均执行截图回归。

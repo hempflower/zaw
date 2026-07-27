@@ -1,0 +1,6 @@
+{
+  "name": "@zaw/electron",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": { "build": "echo 'Electron ships in M7'", "typecheck": "echo 'Electron ships in M7'", "lint": "echo 'Electron ships in M7'", "test": "echo 'Electron ships in M7'" }
+}

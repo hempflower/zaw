@@ -1,0 +1,111 @@
+version: "3"
+
+tasks:
+  deps:
+    desc: Install JavaScript workspace dependencies
+    cmds:
+      - pnpm install {{.CLI_ARGS | default "--frozen-lockfile=false"}}
+  up:
+    desc: Start local MySQL, MinIO, and OpenBao
+    cmds:
+      - docker compose up -d
+  down:
+    desc: Stop local dependencies
+    cmds:
+      - docker compose down
+  migrate:
+    desc: Apply configured database migrations (MySQL or SQLite)
+    cmds:
+      - go run ./cmd/zaw server --migrate-only
+  server:
+    desc: Run the Zaw control plane
+    cmds:
+      - go run ./cmd/zaw server
+  provisioner:
+    desc: Run a local Provisioner
+    cmds:
+      - go run ./cmd/zaw provisioner
+  agent-host:
+    desc: Run an Agent Host
+    cmds:
+      - go run ./cmd/zaw agent-host
+  web:
+    desc: Run Browser Workbench in development mode
+    cmds:
+      - pnpm --filter @zaw/browser dev
+  demo-template:
+    desc: Register the local Docker demo template with the running Server
+    cmds:
+      - scripts/register-demo-template.sh
+  build:
+    desc: Build Go commands and all TypeScript packages
+    cmds:
+      - go build ./cmd/...
+      - pnpm -r build
+  fmt:
+    desc: Format Go, Terraform, TypeScript, and SCSS sources
+    cmds:
+      - $(go env GOROOT)/bin/gofmt -w cmd internal
+      - terraform fmt -recursive examples/templates
+      - pnpm format
+  test:
+    desc: Run Go and TypeScript tests
+    cmds:
+      - go test ./...
+      - pnpm -r test
+  lint:
+    desc: Run static checks
+    cmds:
+      - task: check-go-format
+      - task: check-frontend-format
+      - task: check-terraform
+      - go vet ./...
+      - pnpm -r lint
+      - pnpm -r typecheck
+      - task: check-source-style
+  test-e2e:
+    desc: Run control-plane, AHP Mux, catalog, and Agent Host end-to-end tests
+    cmds:
+      - >-
+        go test ./internal/interfaces/http
+        -run 'Test(AgentHost|AHPGateway|Connected|ControlPlane|SessionCatalog|AHPMux|Credential)'
+        -count=1
+      - >-
+        go test ./internal/agenthost
+        -run 'Test(HostMux|MuxTransport|TerminalClientClaim|OfficialAHPClient|WorkspaceChange|StandardChangeset)'
+        -count=1
+  test-incus:
+    desc: Verify the Ubuntu 24 Incus template lifecycle on the local host
+    cmds:
+      - scripts/verify-incus-template.sh
+  screenshots:
+    desc: Capture Workbench screenshots for viewports and themes
+    cmds:
+      - node scripts/capture-workbench.mjs
+  check-source-style:
+    desc: Reject source lines longer than 100 characters
+    cmds:
+      - "awk 'length($0) > 100 { print FILENAME \":\" FNR \":\" length($0); failed = 1 } END { exit failed }' $(find apps packages cmd internal -type d -name dist -prune -o -type f \\( -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.scss' \\) -print | sort)"
+  check-go-format:
+    desc: Verify Go source is gofmt formatted
+    cmds:
+      - |
+        unformatted="$($(go env GOROOT)/bin/gofmt -l $(find cmd internal -type f -name '*.go' -print | sort))"
+        test -z "$unformatted" || { printf '%s\n' "$unformatted"; exit 1; }
+  check-frontend-format:
+    desc: Verify TypeScript, TSX, and SCSS sources are Prettier formatted
+    cmds:
+      - pnpm format:check
+  check-terraform:
+    desc: Verify Terraform examples are consistently formatted
+    cmds:
+      - terraform fmt -check -recursive examples/templates
+  vendor-protocols:
+    desc: Refresh the pinned AHP specification
+    cmds:
+      - scripts/vendor-protocol-specs.sh
+  check-protocols:
+    desc: Verify the vendored AHP specification and SDK versions did not drift
+    cmds:
+      - scripts/vendor-protocol-specs.sh --check
+      - scripts/check-ahp-contract.sh

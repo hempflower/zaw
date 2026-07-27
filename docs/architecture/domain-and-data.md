@@ -23,14 +23,16 @@ Workspace {
   desiredState: running | stopped | deleted,
   observedState: pending | provisioning | running | stopping |
                  stopped | deleting | failed | degraded,
-  currentBuildId?, agentHostStatus
+  currentBuildId?, agentHostState
+	  modelId?
 }
 ~~~
 
 规则：
 
 - 一个 Workspace 可以有多个 Session。
-- Session 仅在所属 Workspace 下展示。
+- Session 通过 HTTP Catalog 按 Workspace 分组展示；窗口可同时列出多个
+  Workspace，但实时区域只 attach 当前 Session 所属 Workspace。
 - Workspace 停止或 Agent Host 离线时，Session 历史仍可查看，但不可执行新请求或创建终端。
 - 停止是否释放计算资源、保留卷、缓存或网络资源由 Template 定义。
 - Workspace 资源可重建；Workspace ID、权限和 Build 审计保留。
@@ -47,7 +49,8 @@ create | start | stop | reconfigure | rebuild-from-current-template | repair | d
 
 ## Agent Host 注册
 
-MySQL 只保存 Agent Host 与 Workspace 的关联、最后遥测和在线状态。在线 WebSocket 注册表仅存在 Server 进程内，可直接丢失：
+Gorm 保存 Agent Host 与 Workspace 的关联、最后遥测和在线状态。在线
+WebSocket 注册表仅存在 Server 进程内，可直接重建：
 
 ~~~
 LiveAgentHostConnection {
@@ -55,9 +58,11 @@ LiveAgentHostConnection {
 }
 ~~~
 
-## MySQL
+## Gorm 与数据库
 
-MySQL 使用 8.0、InnoDB、utf8mb4 和 DATETIME(3)。ID 在第一条迁移前统一选择 ULID 字符串或 BINARY(16) UUID。
+开发和单节点模式支持 SQLite，生产部署支持 MySQL 8.0。数据库通过环境
+变量和 `.env` 选择。模型使用显式时间字段，不包含 `gorm.DeletedAt`，不启用
+Gorm 软删除。
 
 首批表：
 
@@ -74,18 +79,25 @@ workspace_resources
 provisioners
 provisioner_jobs
 agent_hosts
+session_summaries
 credentials
 audit_logs
+llm_providers
+llm_models
 ~~~
 
-不创建任何 Session 相关表。
+`session_summaries` 是 HTTP Catalog 的轻量 Read Model，只保存 Workspace、
+Session resource、标题、状态、活动描述、修改时间、观察时间、stale 标记和
+可选 Changes 摘要。不得保存完整聊天消息、Terminal 输出、Changeset 内容、
+AHP snapshot 或 action history。
 
 ## 存储边界
 
 | 数据 | 存储位置 |
 | --- | --- |
-| 业务元数据、状态、审计 | MySQL |
+| 业务元数据、状态、审计、SessionSummary | SQLite / MySQL |
 | Terraform State | 独立远程 State Backend，例如 MinIO/S3 |
 | Secret | Secret Manager |
+| Model Provider API key | Secret Manager；Gorm 仅保存 Secret reference |
 | 模板文件 | Git 或 Tar URL |
 | 临时 Terraform 工作目录 | Provisioner 节点临时磁盘，完成后清理 |

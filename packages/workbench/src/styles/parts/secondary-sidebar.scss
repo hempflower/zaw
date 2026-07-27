@@ -1,0 +1,129 @@
+.session-sidebar {
+  min-height: 0;
+  padding: 0 9px;
+  overflow: auto;
+  color: var(--zaw-foreground);
+  background: var(--zaw-surface);
+}
+
+.changes-header {
+  padding: 0 1px 8px;
+  border-bottom: 1px solid var(--zaw-border);
+}
+.detail-pane-tab-row {
+  display: flex;
+  margin: 0 -10px 9px;
+  border-bottom: 1px solid var(--zaw-border);
+}
+.detail-pane-tabbar {
+  flex: 1;
+}
+.changes-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.changes-title > span {
+  display: inline-flex;
+  gap: 1px;
+}
+.changes-header strong {
+  color: var(--zaw-foreground-strong);
+  font-size: 13px;
+}
+.changes-summary {
+  margin: 8px 5px 0;
+  color: var(--zaw-foreground-muted);
+  font-size: 11px;
+}
+.changes-summary span {
+  color: var(--zaw-success);
+}
+.changes-summary i {
+  color: var(--zaw-error);
+  font-style: normal;
+}
+
+.changes-workspace {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 7px 6px;
+  color: var(--zaw-foreground);
+  font-size: 12px;
+
+  span:last-child {
+    color: var(--zaw-description);
+    text-transform: capitalize;
+  }
+}
+
+.change-list,
+.file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.change-list li,
+.file-list li {
+  display: flex;
+  gap: 8px;
+  min-height: 24px;
+  align-items: center;
+  padding: 3px 7px;
+  overflow: hidden;
+  color: var(--zaw-foreground);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  &:hover {
+    background: var(--zaw-surface-hover);
+  }
+}
+
+.file-status {
+  color: var(--zaw-success);
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    monospace;
+}
+.file-list .zaw-button {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.change-row {
+  gap: 4px;
+}
+.change-path {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+  overflow: hidden;
+  color: var(--zaw-foreground);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.change-actions {
+  display: inline-flex;
+  gap: 1px;
+}
+.change-actions .zaw-button {
+  min-height: 21px;
+  padding: 2px 3px;
+}
+.change-actions .reviewed {
+  color: var(--zaw-link);
+  background: var(--zaw-surface-active);
+}
+
+.file-preview {
+  max-width: 100%;
+  margin: 8px;
+  padding: 8px;
+  overflow: auto;
+  color: var(--zaw-foreground);
+  background: var(--zaw-workbench-background);
+}

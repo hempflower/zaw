@@ -1,0 +1,28 @@
+.zaw-quick-pick {
+  display: grid;
+  padding: 4px;
+  background: var(--zaw-surface);
+  border: 1px solid var(--zaw-border-strong);
+  box-shadow: 0 8px 24px var(--zaw-shadow);
+}
+
+.zaw-quick-pick-row {
+  display: grid;
+  min-height: 28px;
+  gap: 2px;
+  padding: 4px 7px;
+  color: var(--zaw-foreground);
+  text-align: left;
+  background: transparent;
+  border: 0;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--zaw-surface-active);
+    outline: none;
+  }
+
+  small {
+    color: var(--zaw-description);
+  }
+}
