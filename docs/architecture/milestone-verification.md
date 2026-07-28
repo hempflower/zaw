@@ -225,7 +225,7 @@ Incus      6.0.0
 - [x] stdout/stderr 按行流式写入，并对 State/环境 Secret 跨 chunk 脱敏。
 - [x] sensitive Terraform output 不进入 WorkspaceResource summary。
 - [x] 独立临时工作目录、持久插件缓存和失败目录策略可配置。
-- [x] S3-compatible backend 使用 Workspace 独立 key 和 lockfile。
+- [x] 本地 State backend 使用 Workspace 独立持久路径。
 
 ### Runner 行为验收
 
@@ -295,7 +295,7 @@ Incus      6.0.0
 - [x] 只有 delete 调用 `terraform destroy`。
 - [x] Provisioner 可注入 Agent Host binary、0600 配置和 0600 注册凭证。
 - [x] 注册凭证不进入 Terraform variable、命令参数或 State。
-- [x] S3-compatible State 使用固定 source snapshot 和 Workspace 独立 key。
+- [x] 本地 State 使用固定 source snapshot 和 Workspace 独立路径。
 - [x] `task test-incus` 提供有安全前缀与失败清理的本机实机验收。
 
 ### 实机生命周期验收
@@ -872,12 +872,12 @@ M11 仍保留旧 Workbench 方法名 `promptSession` 作为内部 UI facade，�
 ### 验收清单
 
 - [x] Credential View 支持 token、username/password 和 SSH key metadata。
-- [x] Secret 只进入 Secret Manager；Gorm 和普通 API 不返回 secretRef 或 Secret。
+- [x] Secret 只进入 Local Secret Store；Gorm 和普通 API 不返回 secretRef 或 Secret。
 - [x] metadata-only 编辑不会替换或轮换已保存 Secret。
 - [x] Credential View 明确显示“不自动轮换”策略和 Template 使用范围。
 - [x] 删除使用确认 Dialog，并拒绝 Template/Workspace snapshot 引用。
-- [x] Provisioner Lease 只对 claimed job 的 Build source snapshot 授权。
-- [x] 私有 Git/Tar 从 Secret Manager 读取并通过环境或 Header 使用凭证。
+- [x] Provisioner Credential 只对 claimed job 的 Build source snapshot 授权。
+- [x] 私有 Git/Tar 从 Local Secret Store 读取并通过环境或 Header 使用凭证。
 
 ### 验收记录
 
@@ -885,7 +885,7 @@ M11 仍保留旧 Workbench 方法名 `promptSession` 作为内部 UI facade，�
 2026-07-27  Credential View metadata/usage/no-secret 测试    通过
 2026-07-27  Credential API create/edit/list no-secret 测试  通过
 2026-07-27  metadata 编辑不轮换 Secret 测试                通过
-2026-07-27  claimed Build Credential Lease 授权边界测试    通过
+2026-07-27  claimed Build Credential 授权边界测试          通过
 2026-07-27  Template/Workspace 引用删除保护测试            通过
 2026-07-27  go test -race（http/source）                   通过
 2026-07-27  task check-protocols                           通过
@@ -971,7 +971,7 @@ M11 仍保留旧 Workbench 方法名 `promptSession` 作为内部 UI facade，�
 - [x] Server 重启后 Host 自动重连、固定凭证不变，Session 与 Catalog 被重新校正。
 - [x] 真实 Incus VM stop/start 保持 UUID；只有 delete 销毁 VM 和数据卷。
 - [x] SQLite 与 MySQL 运行同一套 Gorm migration/repository/no-soft-delete 验收。
-- [x] AHP 副本、Credential Build Lease、Secret Store 和 API no-secret 边界通过。
+- [x] AHP 副本、Build Credential、Local Secret Store 和 API no-secret 边界通过。
 - [x] 中立 LLM API 不包含 `include`、`store` 或 `prompt_cache_key`。
 - [x] Desktop、Tablet、Mobile、四种主题和 Management viewport 截图已更新。
 
@@ -988,7 +988,7 @@ M11 仍保留旧 Workbench 方法名 `promptSession` 作为内部 UI facade，�
 2026-07-27  Chat/Terminal/Changes/Files AHP Workbench       通过
 2026-07-27  Mux 多 Client/Peer/订阅/claim 隔离              通过
 2026-07-27  Server restart/Host reconnect/Catalog reconcile 通过
-2026-07-27  Credential Lease、Secret no-leak、协议副本      通过
+2026-07-27  Build Credential、Secret no-leak、协议副本      通过
 2026-07-27  task check-protocols                            通过
 2026-07-27  task lint                                       通过
 2026-07-27  task test                                       通过

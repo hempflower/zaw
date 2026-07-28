@@ -3,7 +3,6 @@ package credential
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/zaw-dev/zaw/internal/domain"
 	domainCredential "github.com/zaw-dev/zaw/internal/domain/credential"
@@ -29,12 +28,4 @@ func (s Service) Create(
 		return "", err
 	}
 	return secretRef, nil
-}
-
-func (s Service) LeaseForBuild(
-	ctx context.Context,
-	secretRef string,
-	buildID string,
-) (string, error) {
-	return s.Secrets.Lease(ctx, secretRef, buildID, 10*time.Minute)
 }

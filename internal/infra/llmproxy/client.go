@@ -78,11 +78,11 @@ func (c *Client) startRequest(
 		}
 		defer response.Body.Close()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
-			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+			body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 			sendError(
 				events,
 				"provider_http_error",
-				fmt.Sprintf("model provider returned HTTP %d", response.StatusCode),
+				providerHTTPError(response.StatusCode, body),
 				response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500,
 			)
 			return
@@ -90,6 +90,32 @@ func (c *Client) startRequest(
 		consume(response, events)
 	}()
 	return domainllm.Generation{Events: events}, nil
+}
+
+func providerHTTPError(status int, body []byte) string {
+	message := ""
+	var payload struct {
+		Message string `json:"message"`
+		Error   struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &payload) == nil {
+		message = strings.TrimSpace(payload.Error.Message)
+		if message == "" {
+			message = strings.TrimSpace(payload.Message)
+		}
+	}
+	if message == "" {
+		message = strings.TrimSpace(string(body))
+	}
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	if message == "" {
+		return fmt.Sprintf("model provider returned HTTP %d", status)
+	}
+	return fmt.Sprintf("model provider returned HTTP %d: %s", status, message)
 }
 
 func sendError(
@@ -193,6 +219,24 @@ func mediaSubtype(mediaType string) string {
 		return subtype
 	}
 	return mediaType
+}
+
+// Some compatible APIs initialize tool input with `{}` and then stream the
+// actual JSON. Keep that empty object as a replaceable placeholder.
+func appendToolArguments(call *domainllm.ToolCall, delta string) string {
+	current := strings.TrimSpace(string(call.Arguments))
+	if current == "{}" {
+		if strings.TrimSpace(delta) == "{}" {
+			return ""
+		}
+		call.Arguments = append(call.Arguments[:0], delta...)
+		return delta
+	}
+	call.Arguments = append(call.Arguments, delta...)
+	if current == "" && strings.TrimSpace(delta) == "{}" {
+		return ""
+	}
+	return delta
 }
 
 func defaultString(value string, fallback string) string {

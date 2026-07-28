@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: environment.ZAW_DEV_API_URL || "http://127.0.0.1:8080",
           changeOrigin: true,
+          rewriteWsOrigin: true,
           ws: true,
         },
       },

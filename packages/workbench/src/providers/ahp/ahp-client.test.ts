@@ -34,6 +34,13 @@ class MockWebSocket {
             {
               resource: "ahp-root://",
               state: {
+                agents: [
+                  {
+                    provider: "copilot",
+                    displayName: "GitHub Copilot",
+                    description: "Agent SDK",
+                  },
+                ],
                 terminals: [
                   { resource: "ahp-terminal:/existing", title: "Existing" },
                 ],
@@ -156,6 +163,9 @@ describe("AHPClient", () => {
       "ws://zaw.test/api/v1/workspaces/workspace-1/ahp",
     );
     expect(client.workspaceDirectory()).toBe("file:///workspace/");
+    expect(client.listAgents()).toEqual([
+      { description: "Agent SDK", id: "copilot", name: "GitHub Copilot" },
+    ]);
     expect(client.isClosed()).toBe(false);
     const initialize = JSON.parse(
       MockWebSocket.instances[0]?.sent[0] ?? "{}",
@@ -186,10 +196,31 @@ describe("AHPClient", () => {
       method: "root/sessionAdded",
       params: { channel: "ahp-root://", serverSeq: 3 },
     });
+    MockWebSocket.instances[0]?.receive({
+      jsonrpc: "2.0",
+      method: "action",
+      params: {
+        action: {
+          type: "root/agentsChanged",
+          agents: [
+            {
+              provider: "claude",
+              displayName: "Claude",
+              description: "Dynamic provider",
+            },
+          ],
+        },
+        channel: "ahp-root://",
+        serverSeq: 4,
+      },
+    });
     client.terminalResize("ahp-terminal:/one", 120, 40);
     MockWebSocket.instances[0]?.close();
 
-    expect(actions).toEqual(["root/sessionAdded"]);
+    expect(actions).toEqual(["root/sessionAdded", "root/agentsChanged"]);
+    expect(client.listAgents()).toEqual([
+      { description: "Dynamic provider", id: "claude", name: "Claude" },
+    ]);
     expect(MockWebSocket.instances[0]?.sent.at(-1)).toContain(
       "terminal/resized",
     );
@@ -222,6 +253,21 @@ describe("AHPClient", () => {
     );
   });
 
+  it("preserves the subscribed shell prompt when creating a terminal", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
+    vi.stubGlobal("window", {
+      location: { protocol: "http:", host: "zaw.test" },
+    });
+    const client = await AHPClient.connect("workspace-1");
+
+    await expect(
+      client.createTerminal("ahp-terminal:/new", "Terminal"),
+    ).resolves.toMatchObject({
+      output: "ready\n",
+      resource: "ahp-terminal:/new",
+    });
+  });
+
   it("lists and reads Workspace files through standard AHP resources", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
     vi.stubGlobal("window", {
@@ -248,10 +294,12 @@ describe("AHPClient", () => {
       location: { protocol: "http:", host: "zaw.test" },
     });
     const client = await AHPClient.connect("workspace-1");
-    const created = await client.createSession("AHP chat");
+    const created = await client.createSession("AHP chat", "copilot");
     await client.promptSession(created.resource, {
       text: "hello",
-      model: "model-one",
+      mode: "plan",
+      model: "deepseek/deepseek-v4-pro",
+      reasoningEffort: "high",
       attachments: [
         {
           type: "embeddedResource",
@@ -271,12 +319,16 @@ describe("AHPClient", () => {
       method?: string;
       params?: {
         channel?: string;
+        provider?: string;
         action?: {
           type?: string;
           message?: Record<string, unknown>;
         };
       };
     }>;
+    expect(
+      messages.find((message) => message.method === "createSession")?.params,
+    ).toMatchObject({ provider: "copilot" });
 
     expect(messages.some((message) => message.method === "promptSession")).toBe(
       false,
@@ -293,7 +345,11 @@ describe("AHPClient", () => {
       (message) => message.params?.action?.type === "chat/turnStarted",
     );
     expect(turn?.params?.action?.message).toMatchObject({
-      model: { id: "model-one" },
+      _meta: {
+        "zaw/reasoningEffort": "high",
+        "zaw/agentMode": "plan",
+      },
+      model: { id: "deepseek/deepseek-v4-pro" },
       attachments: [{ type: "embeddedResource", data: "AAAA" }],
     });
     expect(messages.map((message) => message.params?.action?.type)).toEqual(

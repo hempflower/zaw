@@ -17,8 +17,13 @@ local Compose profile, or set `ZAW_DATABASE_DRIVER=sqlite` and
 `ZAW_DATABASE_DSN=./.data/zaw.db` for a single-file local database. Models use
 explicit timestamps only; GORM soft deletion is not enabled.
 
-The local Provisioner stores Terraform state in MinIO. `task up` also creates the
-`zaw-terraform-state` bucket; use the `ZAW_STATE_S3_*` settings in `.env.example`.
+Set distinct `ZAW_PASSWORD`, `ZAW_AUTH_SIGNING_KEY`, and `ZAW_PROVISIONER_KEY` values before starting the
+Server. The former protects the single-user Workbench; the latter authenticates
+Provisioner registration, polling, and build reporting.
+
+The local Provisioner stores Terraform state under `ZAW_TERRAFORM_STATE_DIR`,
+with one state file per Workspace. Keep this directory persistent and back it up
+with the control-plane database.
 The runnable Docker Terraform example is in
 [examples/templates/docker-workspace](/home/evanxiao/zaw/zaw/examples/templates/docker-workspace).
 Its persistent home volume survives a stop build; only delete destroys it.
@@ -33,8 +38,9 @@ streams and persists only a lightweight SessionSummary read model for the HTTP
 catalog; it does not persist complete AHP snapshots or event streams.
 
 The Server owns model configuration for OpenAI, Anthropic, and DeepSeek. Users
-provide each Provider's API base and key; keys remain in Secret Store. Agent Host
-uses the Server's neutral, streaming LLM gateway and never receives an upstream key.
+provide each Provider's API base and key; keys remain in protected local files under
+`ZAW_SECRET_STORE_DIR`. Agent Host uses the Server's neutral, streaming LLM gateway
+and never receives an upstream key.
 
-The local profile intentionally uses a fixed development administrator and OpenBao's
-development server. It must not be exposed outside a developer machine.
+The local profile intentionally uses a fixed development administrator. It must not
+be exposed outside a developer machine.

@@ -593,8 +593,8 @@ Workbench 模型。
 ### 工作项
 
 - [x] 支持 username/password、token 和 SSH key。
-- [x] Secret 保存在 Secret Manager，Gorm 仅保存 metadata。
-- [x] 实现 Credential Lease 和 Build 级授权。
+- [x] Secret 保存在 Local Secret Store，Gorm 仅保存 metadata。
+- [x] 实现 Credential 读取和 Build 级授权。
 - [x] 私有 Git/Tar 可使用短期凭证拉取。
 - [x] HTTP、日志、Terraform 参数和 State 不得包含 Secret。
 - [x] 在浮动窗口内完成创建、编辑、删除和使用范围展示。
@@ -663,7 +663,7 @@ Workbench 模型。
 - [x] 验证多个 Workbench Client 和多个 Logical Peer。
 - [x] 验证 Server 重启、Host 重连和 Catalog 校正。
 - [x] 验证 stop 不 destroy、start 恢复、delete 才销毁。
-- [x] 验证 SQLite/MySQL、协议副本、Credential Lease 和 Secret 安全。
+- [x] 验证 SQLite/MySQL、协议副本、Build Credential 授权和 Secret no-leak 边界。
 - [x] 完成 Desktop、Tablet、Mobile 截图和验证记录。
 
 ### 完成条件

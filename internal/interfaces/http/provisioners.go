@@ -11,6 +11,7 @@ import (
 	storage "github.com/zaw-dev/zaw/internal/infra/persistence/gormstore"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type provisionerRegistration struct {
@@ -160,7 +161,7 @@ type jobEventInput struct {
 	Error     string         `json:"error"`
 }
 
-func (s *Server) credentialLease(w http.ResponseWriter, r *http.Request) {
+func (s *Server) buildCredentialSecret(w http.ResponseWriter, r *http.Request) {
 	provisionerID := routeParam(r, "id")
 	jobID := routeParam(r, "jobID")
 	credentialID := routeParam(r, "credentialID")
@@ -207,29 +208,24 @@ func (s *Server) credentialLease(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	lease, err := s.secrets.Lease(
-		r.Context(),
-		credential.SecretRef,
-		build.ID,
-		10*time.Minute,
-	)
+	secret, err := s.secrets.Read(r.Context(), credential.SecretRef)
 	if err != nil {
-		fail(w, http.StatusBadGateway, "credential lease could not be issued")
+		fail(w, http.StatusBadGateway, "credential secret could not be read")
 		return
 	}
 	metadata := map[string]string{}
 	_ = json.Unmarshal(credential.Metadata, &metadata)
 	s.audit(
 		r.Context(),
-		"credential.lease_issued",
+		"credential.read_for_build",
 		"credential",
 		credentialID,
 		map[string]string{"buildId": build.ID, "provisionerId": provisionerID},
 	)
 	respond(w, http.StatusOK, map[string]any{
-		"leaseToken": lease,
-		"kind":       credential.Kind,
-		"metadata":   metadata,
+		"secret":   secret,
+		"kind":     credential.Kind,
+		"metadata": metadata,
 	})
 }
 
@@ -394,9 +390,11 @@ func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {
 		LastSeenAt:    time.Now().UTC(),
 	}
 	if err := s.db.WithContext(r.Context()).
-		Where("workspace_id = ?", host.WorkspaceID).
-		Assign(host).
-		FirstOrCreate(&host).Error; err != nil {
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "workspace_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "last_telemetry", "last_seen_at"}),
+		}).
+		Create(&host).Error; err != nil {
 		fail(w, 500, err.Error())
 		return
 	}

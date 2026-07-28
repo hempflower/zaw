@@ -1,4 +1,5 @@
 import { Emitter } from "./event";
+import { moveRovingFocus, setRovingTabStop } from "./keyboard-navigation";
 import { Widget, append, createElement } from "./widget";
 
 export type DropdownPanelItem = {
@@ -31,6 +32,7 @@ export class DropdownPanelWidget extends Widget {
     new Emitter<{ item: DropdownPanelItem; event: MouseEvent }>(),
   );
   readonly onDidSelect = this._onDidSelect.event;
+  private readonly buttons: HTMLButtonElement[] = [];
 
   constructor(
     root: HTMLElement,
@@ -81,6 +83,21 @@ export class DropdownPanelWidget extends Widget {
       );
     }
     this.root.replaceChildren(panel);
+    setRovingTabStop(this.buttons);
+    this.listen(panel, "keydown", (event) => {
+      moveRovingFocus(event, this.buttons, "vertical");
+    });
+  }
+
+  focusSelectedOrFirst(last = false): void {
+    const enabled = this.buttons.filter((button) => !button.disabled);
+    const target = last
+      ? enabled.at(-1)
+      : (enabled.find(
+          (button) => button.getAttribute("aria-selected") === "true",
+        ) ?? enabled[0]);
+    setRovingTabStop(this.buttons, target);
+    target?.focus();
   }
 
   private renderItem(item: DropdownPanelItem) {
@@ -112,6 +129,8 @@ export class DropdownPanelWidget extends Widget {
     this.listen(button, "click", (event) =>
       this._onDidSelect.fire({ item, event }),
     );
+    this.listen(button, "focus", () => setRovingTabStop(this.buttons, button));
+    this.buttons.push(button);
     return button;
   }
 }

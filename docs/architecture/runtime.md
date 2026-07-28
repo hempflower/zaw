@@ -70,16 +70,23 @@ Server 不维护第二套完整 Agent 状态。SessionSummary 是面向查询的
 Workspace、Session resource、标题、状态、活动描述、修改时间、观察时间、
 stale 标记和可选 Changes 摘要。
 
+Workbench 使用 `ZAW_PASSWORD` 完成单用户登录。Server 签发 15 天有效的 JWT，
+并存入 `HttpOnly`、`SameSite=Strict` Cookie；Server 重启不影响有效会话。
+该密码不用于机器连接。
+
 ## Provisioner
 
 Provisioner 运行在能访问目标基础设施的节点，主动连接 Server：
+
+- 使用独立的 `ZAW_PROVISIONER_KEY` Bearer Key 完成注册和后续请求认证；该密钥
+  不得与 Workbench 密码或 Agent Host 注册凭证复用。
 
 - 拉取 Git 或 Tar Template，验证固定 Source Snapshot。
 - 使用本机 Terraform CLI 执行 init、plan、apply 和 destroy。
 - 创建、启动、停止、修复、重建和删除 Workspace 资源。
 - stop 只改变运行状态，不从 Terraform State 移除 VM；delete 才 destroy。
 - 上报执行日志、资源摘要、状态和错误。
-- 在授权 Build 中取得短期 Credential Lease。
+- 在已领取且 source snapshot 匹配的 Build 中取得所需 Credential。
 
 ## Agent Host
 
@@ -94,6 +101,8 @@ Agent Host 运行在 Workspace 内：
 - 在物理连接上为 catalog 和 Workbench 提供独立 logical peer。
 - 为每个 peer 隔离 clientId、JSON-RPC ID、subscription、reconnect 和 claim。
 - 通过 HTTP 上报遥测。
+- 使用 Workspace-scoped 注册凭据定期向 Server 检查同平台运行时；SHA-256
+  校验通过后在原目录原子替换，由 systemd 或容器 supervisor 拉起新版本。
 
 官方 Go SDK 提供 Client、transport、reducer 和多 Host 的客户端 runtime，但
 不提供 Agent Host JSON-RPC Server runtime。因此 Agent Host handler 由 Zaw

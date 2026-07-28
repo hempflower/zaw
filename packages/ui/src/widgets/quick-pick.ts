@@ -1,4 +1,5 @@
 import { Emitter } from "./event";
+import { moveRovingFocus, setRovingTabStop } from "./keyboard-navigation";
 import { Widget, append, createElement } from "./widget";
 
 export type QuickPickItem = { description?: string; id: string; label: string };
@@ -18,6 +19,7 @@ export class QuickPickWidget extends Widget {
       className: "zaw-quick-pick",
       role: "listbox",
     });
+    const rows: HTMLButtonElement[] = [];
     this.items.forEach((item) => {
       const row = createElement("button", {
         className: "zaw-quick-pick-row",
@@ -34,7 +36,13 @@ export class QuickPickWidget extends Widget {
       this.listen(row, "click", (event) =>
         this._onDidSelect.fire({ id: item.id, event }),
       );
+      this.listen(row, "focus", () => setRovingTabStop(rows, row));
+      rows.push(row);
       quickPick.append(row);
+    });
+    setRovingTabStop(rows);
+    this.listen(quickPick, "keydown", (event) => {
+      moveRovingFocus(event, rows, "vertical");
     });
     this.root.replaceChildren(quickPick);
   }

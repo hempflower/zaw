@@ -1,4 +1,10 @@
-import { injectable } from "inversify";
+import { Emitter, type Event } from "@zaw/ui";
+import { inject, injectable, optional } from "inversify";
+import {
+  IContextKeyService,
+  type IContextKey,
+} from "../platform/context-key/context-key";
+import { WorkspaceContext } from "../workbench/context-keys";
 
 export const IActiveSessionService = Symbol.for("IActiveSessionService");
 
@@ -8,6 +14,7 @@ export type SessionIdentity = {
 };
 
 export interface IActiveSessionService {
+  readonly onDidChange: Event<SessionIdentity | null>;
   current(): SessionIdentity | null;
   clear(): void;
   select(identity: SessionIdentity): void;
@@ -17,17 +24,33 @@ export interface IActiveSessionService {
 @injectable()
 export class ActiveSessionService implements IActiveSessionService {
   private selected: SessionIdentity | null = null;
+  private readonly emitter = new Emitter<SessionIdentity | null>();
+  readonly onDidChange = this.emitter.event;
+  private readonly activeContext: IContextKey<boolean> | undefined;
+
+  constructor(
+    @optional() @inject(IContextKeyService) contextKeys?: IContextKeyService,
+  ) {
+    this.activeContext =
+      contextKeys && WorkspaceContext.sessionActive.bindTo(contextKeys);
+  }
 
   current() {
     return this.selected ? { ...this.selected } : null;
   }
 
   clear() {
+    if (!this.selected) return;
     this.selected = null;
+    this.activeContext?.set(false);
+    this.emitter.fire(null);
   }
 
   select(identity: SessionIdentity) {
+    if (this.isActive(identity)) return;
     this.selected = { ...identity };
+    this.activeContext?.set(true);
+    this.emitter.fire(this.current());
   }
 
   isActive(identity: SessionIdentity) {

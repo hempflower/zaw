@@ -1,0 +1,225 @@
+.agent-auxiliary-pane {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  grid-template-rows: 35px auto minmax(0, 1fr);
+  color: var(--zaw-agents-panel-foreground);
+  background: transparent;
+}
+
+.agent-auxiliary-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 2px 0 4px;
+  border-bottom: 1px solid var(--zaw-agents-panel-border);
+}
+
+.agent-auxiliary-tab {
+  display: inline-flex;
+  height: 24px;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--zaw-agents-panel-foreground);
+  font-size: var(--zaw-agents-font-size-label1);
+  font-weight: 600;
+  background: color-mix(
+    in srgb,
+    var(--zaw-agents-panel-foreground) 5%,
+    transparent
+  );
+  border-radius: var(--zaw-corner-radius-small);
+}
+
+.agent-auxiliary-tab > .agent-auxiliary-header-actions:last-child {
+  display: inline-flex;
+  margin-left: 1px;
+}
+
+.agent-auxiliary-tab .zaw-action {
+  width: 18px;
+  height: 18px;
+}
+
+.agent-auxiliary-header-actions {
+  min-width: 0;
+  margin-left: auto;
+}
+
+.agent-files-root {
+  box-sizing: border-box;
+  display: grid;
+  height: 31px;
+  min-width: 0;
+  grid-template-columns: 16px 16px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  padding: 0 8px 0 10px;
+  font-size: var(--zaw-agents-font-size-label1);
+}
+
+.agent-files-root strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-files-tree {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.zaw-workbench .agent-file-row {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  height: 22px;
+  min-width: 0;
+  grid-template-columns: 16px 16px minmax(0, 1fr);
+  gap: 2px;
+  align-items: center;
+  padding: 0 8px 0 calc(10px + var(--agent-file-depth, 0) * 12px);
+  color: var(--zaw-agents-panel-foreground);
+  font-size: var(--zaw-agents-font-size-body1);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.zaw-workbench .agent-file-row:hover,
+.zaw-workbench .agent-file-row[data-selected="true"] {
+  background: var(--zaw-list-hover-background);
+}
+
+.agent-file-twisty,
+.agent-file-icon {
+  overflow: hidden;
+  font-size: 14px;
+  text-align: center;
+}
+
+.agent-file-row[data-loading="true"] .agent-file-twisty {
+  animation: zaw-agent-spin 1.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-file-row[data-loading="true"] .agent-file-twisty {
+    animation: none;
+  }
+}
+
+.agent-file-icon {
+  color: var(--zaw-description);
+}
+
+.agent-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-files-empty {
+  margin: 14px 12px;
+  color: var(--zaw-description);
+  font-size: var(--zaw-agents-font-size-label1);
+  line-height: 18px;
+}
+
+.agent-changes-pane {
+  grid-template-rows: 35px minmax(0, 1fr);
+}
+
+.agent-changes-list {
+  min-height: 0;
+  overflow: auto;
+}
+
+.agent-change-row {
+  position: relative;
+  height: 24px;
+}
+
+.zaw-workbench .agent-change-open {
+  display: grid;
+  width: 100%;
+  height: 24px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--zaw-agents-panel-foreground);
+  background: transparent;
+  border: 0;
+}
+
+.zaw-workbench .agent-change-open:hover {
+  background: var(--zaw-list-hover-background);
+}
+
+.agent-change-path {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-change-status {
+  color: var(--zaw-description);
+  font-size: var(--zaw-agents-font-size-label2);
+}
+
+.agent-change-diff {
+  color: var(--zaw-description);
+  font-size: var(--zaw-agents-font-size-label2);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-change-actions {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  display: none;
+  align-items: center;
+  padding-left: 4px;
+  background: var(--zaw-list-hover-background);
+}
+
+.agent-change-row:hover .agent-change-actions,
+.agent-change-row:focus-within .agent-change-actions,
+.agent-change-row[data-selected="true"] .agent-change-actions {
+  display: flex;
+}
+
+.agent-preview-pane {
+  grid-template-rows: 35px minmax(0, 1fr);
+}
+
+.agent-preview-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-preview-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.agent-preview-content {
+  box-sizing: border-box;
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 12px;
+  color: var(--zaw-agents-panel-foreground);
+  font-family: var(--zaw-monospace-font, monospace);
+  font-size: var(--zaw-agents-font-size-body1);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}

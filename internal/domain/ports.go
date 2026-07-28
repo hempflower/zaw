@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"time"
 )
 
 type AgentHostCredential struct {
@@ -17,12 +16,11 @@ type AgentHostIdentity interface {
 	Verify(token string) (AgentHostCredential, error)
 }
 
-// SecretStore keeps secret payloads outside the business database.
+// SecretStore keeps secret payloads in protected local files outside the business database.
 type SecretStore interface {
 	Put(context.Context, string, map[string]string) error
 	Read(context.Context, string) (map[string]string, error)
 	Delete(context.Context, string) error
-	Lease(context.Context, string, string, time.Duration) (string, error)
 }
 
 // SourceResolver converts mutable source references into immutable snapshots.

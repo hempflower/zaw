@@ -49,7 +49,7 @@ zaw Provider 需提供：
 | Workspace Parameter | Workspace 创建者 | CPU、内存、镜像、仓库 |
 | Preset | 模板管理员 | 标准 Go、GPU 大型 |
 | Template Variable | 模板/平台管理员 | 网络 ID、镜像仓库、云配置 |
-| Runtime Secret | Server/Secret Manager | Git Token、Workspace 注册凭据 |
+| Runtime Secret | Server/Local Secret Store | Git Token、Workspace 注册凭据 |
 
 Secret 不得进入 Terraform 明文参数、输出或 State。
 
@@ -112,7 +112,7 @@ Credential 是 Server 内独立系统，可供 Git、Terraform、镜像仓库及
 - 组织管理员创建、编辑和删除凭证。
 - Template 可引用 credentialId。
 - 普通用户不能在创建 Workspace 时选择任意 Credential。
-- Provisioner 仅在授权 Build 中获取短期 Credential Lease。
+- Provisioner 仅在已领取且 source snapshot 匹配的 Build 中获取所需 Credential。
 
 凭证按认证形态区分：
 
@@ -133,7 +133,8 @@ Credential {
 | token | 空对象 |
 | ssh_key | username、publicKey、fingerprint |
 
-密码、Token、私钥和私钥密码只存在 Secret Manager。secretRef 仅是 Credential 系统内部对 Secret Manager 的引用，不暴露给 Workbench、Template 或普通业务 API。
+密码、Token、私钥和私钥密码只存在 Local Secret Store。secretRef 仅是 Credential
+系统内部对本机密钥文件的引用，不暴露给 Workbench、Template 或普通业务 API。
 
 Git 映射：
 

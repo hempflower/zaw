@@ -9,9 +9,11 @@
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,scss}\" \"packages/**/*.{ts,tsx,scss}\"",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
     "lint": "pnpm -r lint"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "1.54.1",
     "prettier": "3.6.2"
   }

@@ -14,55 +14,31 @@ import (
 	"time"
 )
 
-func TestStateInitArgumentsUseWorkspaceSpecificKey(t *testing.T) {
-	config := StateConfig{
-		Endpoint:  "http://127.0.0.1:9000",
-		Bucket:    "zaw-terraform-state",
-		AccessKey: "zawminio",
-		SecretKey: "must-not-appear-in-arguments",
+func TestStateInitArgumentsUseWorkspaceSpecificLocalPath(t *testing.T) {
+	stateDirectory := t.TempDir()
+	config := StateConfig{Directory: stateDirectory}
+	values, err := config.initArguments("workspace-1")
+	if err != nil {
+		t.Fatalf("create state arguments: %v", err)
 	}
-	arguments := strings.Join(config.initArguments("workspace-1"), " ")
-	if !strings.Contains(arguments, "key=workspaces/workspace-1/terraform.tfstate") {
-		t.Fatalf("workspace state key missing: %s", arguments)
+	arguments := strings.Join(values, " ")
+	want := filepath.Join(
+		stateDirectory,
+		"workspaces",
+		"workspace-1",
+		"terraform.tfstate",
+	)
+	if !strings.Contains(arguments, "path="+want) {
+		t.Fatalf("workspace state path missing: %s", arguments)
 	}
-	if strings.Contains(arguments, config.SecretKey) {
-		t.Fatal("state secret must not be placed in Terraform command arguments")
-	}
-	if strings.Contains(arguments, config.Endpoint) {
-		t.Fatalf("S3 endpoint should be supplied through the environment: %s", arguments)
-	}
-	if !strings.Contains(arguments, "use_path_style=true") {
-		t.Fatalf("S3 path-style setting missing: %s", arguments)
-	}
-	if !strings.Contains(arguments, "use_lockfile=true") {
-		t.Fatalf("S3 state lock setting missing: %s", arguments)
-	}
-}
-
-func TestStateEnvironmentKeepsAccessKeysOutOfArguments(t *testing.T) {
-	config := StateConfig{
-		Endpoint:  "http://127.0.0.1:9000",
-		AccessKey: "access",
-		SecretKey: "secret",
-	}
-	environment := strings.Join(config.environment(), " ")
-	if !strings.Contains(environment, "AWS_ACCESS_KEY_ID=access") {
-		t.Fatalf("access key environment missing: %s", environment)
-	}
-	if !strings.Contains(environment, "AWS_SECRET_ACCESS_KEY=secret") {
-		t.Fatalf("secret key environment missing: %s", environment)
-	}
-	if !strings.Contains(environment, "AWS_ENDPOINT_URL_S3=http://127.0.0.1:9000") {
-		t.Fatalf("S3 endpoint environment missing: %s", environment)
-	}
-	if arguments := config.initArguments("workspace"); len(arguments) != 0 {
-		t.Fatalf("state config without bucket must not add init arguments: %v", arguments)
+	if info, err := os.Stat(filepath.Dir(want)); err != nil || !info.IsDir() {
+		t.Fatalf("workspace state directory is unavailable: %v", err)
 	}
 }
 
 func TestRunnerPassesConfiguredDockerHostAsEnvironment(t *testing.T) {
 	runner := Runner{Environment: []string{"DOCKER_HOST=unix:///run/user/1000/docker.sock"}}
-	environment := strings.Join(append(runner.State.environment(), runner.Environment...), " ")
+	environment := strings.Join(runner.Environment, " ")
 	if !strings.Contains(environment, "DOCKER_HOST=unix:///run/user/1000/docker.sock") {
 		t.Fatalf("Docker host environment missing: %s", environment)
 	}
@@ -152,10 +128,10 @@ fi
 `)
 	var logs bytes.Buffer
 	runner := Runner{
-		Binary:      binaryPath,
-		Environment: []string{"API_TOKEN=token-value"},
-		State: StateConfig{
-			SecretKey: "state-secret",
+		Binary: binaryPath,
+		Environment: []string{
+			"API_TOKEN=token-value",
+			"AWS_SECRET_ACCESS_KEY=state-secret",
 		},
 	}
 	resources, err := runner.Execute(

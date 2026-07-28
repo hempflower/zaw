@@ -23,6 +23,7 @@ type Service struct {
 }
 
 type ProviderInput struct {
+	ID      string
 	Name    string
 	Kind    domainllm.ProviderKind
 	APIBase string
@@ -61,7 +62,7 @@ func (s *Service) CreateProvider(
 	if err != nil {
 		return domainllm.Provider{}, err
 	}
-	providerID := newID()
+	providerID := input.ID
 	provider := domainllm.Provider{
 		ID: providerID, OrganizationID: organizationID,
 		Name: input.Name, Kind: input.Kind, APIBase: input.APIBase,
@@ -222,6 +223,13 @@ func (s *Service) Generate(
 	if err != nil {
 		return domainllm.Generation{}, err
 	}
+	selectedModel := domainllm.ModelIdentifier(selection.Provider, selection.Model)
+	if request.Model != "" && request.Model != selectedModel {
+		selection, err = s.resolveRequestedModel(ctx, organizationID, request.Model)
+		if err != nil {
+			return domainllm.Generation{}, err
+		}
+	}
 	if err := validateRequest(request, selection.Model.Capabilities); err != nil {
 		return domainllm.Generation{}, err
 	}
@@ -233,8 +241,34 @@ func (s *Service) Generate(
 	if apiKey == "" {
 		return domainllm.Generation{}, fmt.Errorf("provider API key is unavailable")
 	}
-	request.Model = selection.Model.Name
+	request.Model = selection.Model.UpstreamModel
 	return s.upstream.Generate(ctx, selection, apiKey, request)
+}
+
+func (s *Service) resolveRequestedModel(
+	ctx context.Context,
+	organizationID string,
+	identifier string,
+) (domainllm.Selection, error) {
+	models, err := s.repository.ListModels(ctx, organizationID)
+	if err != nil {
+		return domainllm.Selection{}, err
+	}
+	providers, err := s.repository.ListProviders(ctx, organizationID)
+	if err != nil {
+		return domainllm.Selection{}, err
+	}
+	providersByID := make(map[string]domainllm.Provider, len(providers))
+	for _, provider := range providers {
+		providersByID[provider.ID] = provider
+	}
+	for _, model := range models {
+		provider, ok := providersByID[model.ProviderID]
+		if ok && domainllm.ModelIdentifier(provider, model) == identifier {
+			return domainllm.Selection{Provider: provider, Model: model}, nil
+		}
+	}
+	return domainllm.Selection{}, fmt.Errorf("%w: model %q", domainllm.ErrNotFound, identifier)
 }
 
 func validateRequest(
@@ -346,8 +380,16 @@ func unsupportedCapability(name string) error {
 }
 
 func validateProvider(input ProviderInput, apiKeyRequired bool) (ProviderInput, error) {
+	input.ID = strings.TrimSpace(input.ID)
 	input.Name = strings.TrimSpace(input.Name)
 	input.APIBase = strings.TrimRight(strings.TrimSpace(input.APIBase), "/")
+	if apiKeyRequired && !validProviderID(input.ID) {
+		return input, fmt.Errorf(
+			"%w: id must be 1-26 characters, start with a lowercase letter or number, "+
+				"and contain only lowercase letters, numbers, dots, underscores, or hyphens",
+			domainllm.ErrInvalid,
+		)
+	}
 	if input.Name == "" || input.APIBase == "" {
 		return input, fmt.Errorf("%w: name and apiBase are required", domainllm.ErrInvalid)
 	}
@@ -365,6 +407,22 @@ func validateProvider(input ProviderInput, apiKeyRequired bool) (ProviderInput, 
 	return input, nil
 }
 
+func validProviderID(value string) bool {
+	if len(value) == 0 || len(value) > 26 {
+		return false
+	}
+	for index, char := range value {
+		valid := char >= 'a' && char <= 'z' || char >= '0' && char <= '9'
+		if index > 0 {
+			valid = valid || char == '-' || char == '_' || char == '.'
+		}
+		if !valid {
+			return false
+		}
+	}
+	return true
+}
+
 func validateModel(input ModelInput) (ModelInput, error) {
 	input.ProviderID = strings.TrimSpace(input.ProviderID)
 	input.Name = strings.TrimSpace(input.Name)
@@ -380,6 +438,16 @@ func validateModel(input ModelInput) (ModelInput, error) {
 			"%w: model capabilities must enable textInput",
 			domainllm.ErrInvalid,
 		)
+	}
+	if input.Capabilities.ContextWindow <= 0 {
+		return input, fmt.Errorf(
+			"%w: contextWindow must be greater than zero",
+			domainllm.ErrInvalid,
+		)
+	}
+	if !input.Capabilities.Reasoning {
+		input.Capabilities.ReasoningEfforts = nil
+		input.Capabilities.DefaultReasoningEffort = ""
 	}
 	defaultEffort := input.Capabilities.DefaultReasoningEffort
 	if defaultEffort != "" &&

@@ -91,6 +91,38 @@ func TestOpenAIAdapterConvertsNeutralMultimodalToolAndReasoningRequest(t *testin
 	}
 }
 
+func TestAnthropicRequestKeepsThinkingAndToolUseInOneAssistantTurn(t *testing.T) {
+	payload, err := anthropicRequest(domainllm.GenerateRequest{
+		Messages: []domainllm.Message{
+			{Role: "assistant", Content: []domainllm.ContentPart{{
+				Type: "reasoning", Text: "exact thinking", Signature: "signature",
+			}}},
+			{Role: "assistant", ToolCalls: []domainllm.ToolCall{{
+				ID: "call-1", Name: "shell", Arguments: json.RawMessage(`{"command":"pwd"}`),
+			}}},
+			{Role: "tool", ToolCallID: "call-1", Content: []domainllm.ContentPart{{
+				Type: "text", Text: "/workspace",
+			}}},
+		},
+	}, "deepseek-v4-pro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages, _ := payload["messages"].([]map[string]any)
+	if len(messages) != 2 {
+		t.Fatalf("wire messages = %#v, want assistant and tool-result turns", messages)
+	}
+	assistantContent, _ := messages[0]["content"].([]map[string]any)
+	if len(assistantContent) != 2 || assistantContent[0]["type"] != "thinking" ||
+		assistantContent[1]["type"] != "tool_use" {
+		t.Fatalf("assistant content = %#v, want thinking followed by tool_use", assistantContent)
+	}
+	if assistantContent[0]["thinking"] != "exact thinking" ||
+		assistantContent[0]["signature"] != "signature" {
+		t.Fatalf("thinking block was not preserved: %#v", assistantContent[0])
+	}
+}
+
 func TestEveryProviderConvertsNativeStreamToNeutralEvents(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -196,6 +228,7 @@ func TestEveryProviderConvertsNativeStreamToNeutralEvents(t *testing.T) {
 			}
 			var got []string
 			gotTool := false
+			gotArguments := ""
 			for event := range generation.Events {
 				if event.Error != nil {
 					t.Fatalf("stream error: %#v", event.Error)
@@ -204,6 +237,9 @@ func TestEveryProviderConvertsNativeStreamToNeutralEvents(t *testing.T) {
 				if event.Response != nil {
 					for _, part := range event.Response.Output {
 						gotTool = gotTool || part.Type == "tool_call"
+						if part.Type == "tool_call" && part.ToolCall != nil {
+							gotArguments = string(part.ToolCall.Arguments)
+						}
 					}
 				}
 			}
@@ -213,7 +249,55 @@ func TestEveryProviderConvertsNativeStreamToNeutralEvents(t *testing.T) {
 			if !gotTool {
 				t.Fatal("completed neutral response did not contain the streamed tool call")
 			}
+			if gotArguments != `{"q":1}` {
+				t.Fatalf("completed tool arguments = %q", gotArguments)
+			}
 		})
+	}
+}
+
+func TestProviderHTTPErrorPreservesSafeUpstreamMessage(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"unsupported reasoning effort"}}`))
+	}))
+	defer upstream.Close()
+	generation, err := NewClient(nil).Generate(
+		context.Background(),
+		testSelection(domainllm.ProviderOpenAI, upstream.URL, "model"),
+		"secret",
+		domainllm.GenerateRequest{Messages: []domainllm.Message{{
+			Role: "user", Content: []domainllm.ContentPart{{Type: "text", Text: "hi"}},
+		}}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := <-generation.Events
+	if event.Error == nil || !strings.Contains(event.Error.Message, "unsupported reasoning effort") {
+		t.Fatalf("upstream error = %#v", event.Error)
+	}
+}
+
+func TestDeepSeekToolArgumentsReplaceEmptyObjectPlaceholder(t *testing.T) {
+	call := &domainllm.ToolCall{}
+	if delta := appendToolArguments(call, `{}`); delta != "" {
+		t.Fatalf("placeholder was forwarded as %q", delta)
+	}
+	real := `{"command":"curl -sI https://www.baidu.com"}`
+	if delta := appendToolArguments(call, real); delta != real {
+		t.Fatalf("real argument delta = %q", delta)
+	}
+	if got := string(call.Arguments); got != real {
+		t.Fatalf("tool arguments = %q, want %q", got, real)
+	}
+}
+
+func TestDeepSeekToolArgumentsKeepEmptyObjectForArgumentlessTools(t *testing.T) {
+	call := &domainllm.ToolCall{}
+	_ = appendToolArguments(call, `{}`)
+	if got := string(call.Arguments); got != `{}` {
+		t.Fatalf("argumentless tool arguments = %q", got)
 	}
 }
 

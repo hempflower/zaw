@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	storage "github.com/zaw-dev/zaw/internal/infra/persistence/gormstore"
 	"gorm.io/datatypes"
@@ -45,15 +44,6 @@ func (s *memorySecretStore) Delete(_ context.Context, ref string) error {
 	return nil
 }
 
-func (s *memorySecretStore) Lease(
-	_ context.Context,
-	_ string,
-	_ string,
-	_ time.Duration,
-) (string, error) {
-	return "lease", nil
-}
-
 func TestCredentialAPINeverReturnsSecretAndKeepsItOnMetadataEdit(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -86,7 +76,7 @@ func TestCredentialAPINeverReturnsSecretAndKeepsItOnMetadataEdit(t *testing.T) {
 	}
 	stored := secrets.values["zaw/credentials/"+credential.ID]
 	if stored["token"] != "never-return-this" {
-		t.Fatal("credential secret was not stored in the secret manager")
+		t.Fatal("credential secret was not stored in the local secret store")
 	}
 
 	updated := request(
@@ -190,7 +180,7 @@ func TestCredentialDeleteRejectsTemplateAndWorkspaceReferences(t *testing.T) {
 	}
 }
 
-func TestCredentialLeaseIsRestrictedToClaimedBuildSnapshot(t *testing.T) {
+func TestCredentialSecretIsRestrictedToClaimedBuildSnapshot(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -199,6 +189,7 @@ func TestCredentialLeaseIsRestrictedToClaimedBuildSnapshot(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	secrets := &memorySecretStore{values: map[string]map[string]string{}}
+	secrets.values["zaw/credentials/credential-lease"] = map[string]string{"token": "secret"}
 	server := New(database, nil, secrets)
 	if err := server.Bootstrap(context.Background()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
@@ -224,20 +215,20 @@ func TestCredentialLeaseIsRestrictedToClaimedBuildSnapshot(t *testing.T) {
 		}
 	}
 	path := "/api/v1/provisioners/provisioner-1/jobs/job-lease/credentials/"
-	authorized := request(t, server.Handler(), http.MethodPost, path+credential.ID+"/lease", nil)
+	authorized := request(t, server.Handler(), http.MethodPost, path+credential.ID+"/secret", nil)
 	if authorized.Code != http.StatusOK ||
-		!strings.Contains(authorized.Body.String(), `"leaseToken":"lease"`) {
-		t.Fatalf("authorized lease = %d: %s", authorized.Code, authorized.Body.String())
+		!strings.Contains(authorized.Body.String(), `"secret":{"token":"secret"}`) {
+		t.Fatalf("authorized secret = %d: %s", authorized.Code, authorized.Body.String())
 	}
 	forbidden := request(
 		t,
 		server.Handler(),
 		http.MethodPost,
-		path+"credential-other/lease",
+		path+"credential-other/secret",
 		nil,
 	)
 	if forbidden.Code != http.StatusForbidden {
-		t.Fatalf("unauthorized lease = %d: %s", forbidden.Code, forbidden.Body.String())
+		t.Fatalf("unauthorized secret = %d: %s", forbidden.Code, forbidden.Body.String())
 	}
 }
 

@@ -1,0 +1,93 @@
+:root {
+  --zaw-agents-background: var(--zaw-editor-background);
+  --zaw-agents-panel-background: var(--zaw-surface);
+  --zaw-agents-panel-foreground: var(--zaw-foreground);
+  --zaw-agents-panel-border: color-mix(
+    in srgb,
+    var(--zaw-foreground) 15%,
+    transparent
+  );
+  --zaw-agents-gradient-tint: var(--zaw-button-background);
+  --zaw-agents-chat-input-background: var(--zaw-input-background);
+  --zaw-agents-chat-input-foreground: var(--zaw-foreground);
+  --zaw-agents-chat-input-border: var(--zaw-border-strong);
+  --zaw-agents-chat-input-focus-border: var(--zaw-focus-border);
+  --zaw-agents-chat-input-placeholder: var(--zaw-description);
+  --zaw-agents-chat-request-background: color-mix(
+    in srgb,
+    var(--zaw-agents-panel-foreground) 4%,
+    transparent
+  );
+  --zaw-agents-chat-request-border: color-mix(
+    in srgb,
+    var(--zaw-agents-panel-foreground) 16%,
+    transparent
+  );
+  --zaw-agents-new-session-button-background: transparent;
+  --zaw-agents-new-session-button-foreground: var(--zaw-foreground);
+  --zaw-agents-new-session-button-border: var(--zaw-border-strong);
+  --zaw-agents-new-session-button-hover: var(--zaw-surface-hover);
+  --zaw-agents-badge-background: var(--zaw-button-background);
+  --zaw-agents-badge-foreground: var(--zaw-button-foreground);
+  --zaw-agents-active-session-background: var(--zaw-agents-panel-background);
+  --zaw-agents-inactive-session-background: var(--zaw-agents-background);
+  --zaw-agents-active-session-foreground: var(--zaw-agents-panel-foreground);
+  --zaw-agents-inactive-session-foreground: var(--zaw-agents-panel-foreground);
+  --zaw-toolbar-hover-background: var(--zaw-surface-hover);
+  --zaw-toolbar-active-background: var(--zaw-surface-active);
+  --zaw-list-active-background: var(--zaw-surface-active);
+  --zaw-list-inactive-selection-background: color-mix(
+    in srgb,
+    var(--zaw-surface-active) 55%,
+    transparent
+  );
+  --zaw-list-hover-background: var(--zaw-surface-hover);
+  --zaw-list-warning-foreground: #cca700;
+  --zaw-text-code-block-background: color-mix(
+    in srgb,
+    var(--zaw-agents-panel-foreground) 7%,
+    transparent
+  );
+  --zaw-text-link-foreground: var(--zaw-focus-border);
+  --zaw-editor-font-family: "SFMono-Regular", Consolas, monospace;
+  --zaw-agents-diff-added: var(--zaw-success);
+  --zaw-agents-diff-removed: var(--zaw-error);
+  --zaw-spacing-20: 2px;
+  --zaw-spacing-40: 4px;
+  --zaw-spacing-60: 6px;
+  --zaw-spacing-80: 8px;
+  --zaw-spacing-100: 10px;
+  --zaw-spacing-120: 12px;
+  --zaw-spacing-160: 16px;
+  --zaw-spacing-200: 20px;
+  --zaw-spacing-320: 32px;
+  --zaw-corner-radius-small: 3px;
+  --zaw-corner-radius-medium: 5px;
+  --zaw-corner-radius-large: 8px;
+  --zaw-corner-radius-circle: 999px;
+  --zaw-stroke-thickness: 1px;
+  --zaw-agents-floating-panel-gap: 8px;
+  --zaw-agents-font-size-label2: 11px;
+  --zaw-agents-font-size-label1: 12px;
+  --zaw-agents-font-size-body1: 13px;
+  --zaw-agents-font-size-heading2: 18px;
+  --zaw-codicon-font-size: 16px;
+  --zaw-codicon-font-size-compact: 12px;
+}
+
+:root[data-zaw-theme="light"] {
+  --zaw-agents-background: var(--zaw-surface);
+  --zaw-agents-panel-background: var(--zaw-editor-background);
+}
+
+:root[data-zaw-theme="hc"] {
+  --zaw-agents-panel-border: var(--zaw-border);
+  --zaw-list-warning-foreground: #ffff00;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-zaw-theme="system"] {
+    --zaw-agents-background: var(--zaw-surface);
+    --zaw-agents-panel-background: var(--zaw-editor-background);
+  }
+}

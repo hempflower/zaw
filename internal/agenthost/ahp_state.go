@@ -251,8 +251,13 @@ func (h *Host) startChatTurn(
 	origin *ahptypes.ActionOrigin,
 ) {
 	h.emitChatAction(entry.Chat.Resource, ahptypes.StateAction{Value: &action}, origin)
+	request := promptRequest(action.Message)
+	h.mu.Lock()
+	current := h.sessions[string(entry.Resource)]
+	current.ApprovalMode = request.ApprovalMode
+	h.sessions[string(entry.Resource)] = current
+	h.mu.Unlock()
 	go func() {
-		request := promptRequest(action.Message)
 		if err := entry.AgentSession.Prompt(context.Background(), request); err != nil {
 			h.emitChatAction(entry.Chat.Resource, ahptypes.StateAction{
 				Value: &ahptypes.ChatErrorAction{
@@ -269,6 +274,22 @@ func promptRequest(message ahptypes.Message) agentsdk.PromptRequest {
 	request := agentsdk.PromptRequest{Text: message.Text}
 	if message.Model != nil {
 		request.Model = message.Model.Id
+	}
+	if raw, ok := message.Meta["zaw/reasoningEffort"]; ok {
+		_ = json.Unmarshal(raw, &request.ReasoningEffort)
+	}
+	if raw, ok := message.Meta["zaw/approvalMode"]; ok {
+		_ = json.Unmarshal(raw, &request.ApprovalMode)
+	}
+	if raw, ok := message.Meta["zaw/agentMode"]; ok {
+		_ = json.Unmarshal(raw, &request.AgentMode)
+	}
+	if request.AgentMode == "plan" {
+		// Plan is an explicit SDK mode and takes precedence over approval policy.
+	} else if request.ApprovalMode == "autopilot" {
+		request.AgentMode = "autopilot"
+	} else {
+		request.AgentMode = "interactive"
 	}
 	for _, attachment := range message.Attachments {
 		value, ok := attachment.Value.(*ahptypes.MessageEmbeddedResourceAttachment)
@@ -339,16 +360,17 @@ func (h *Host) emitPermissionRequest(
 	pending pendingPermission,
 	request agentsdk.PermissionRequest,
 ) {
-	detail := strings.TrimSpace(string(request.Data))
-	if detail == "" {
-		detail = request.Kind
-	}
+	rawInput := strings.TrimSpace(string(request.Data))
+	detail := permissionRequestDetail(request)
 	title := strings.TrimSpace(request.Kind)
 	if title == "" {
 		title = "Agent tool"
 	}
 	invocation := ahptypes.NewStringOrMarkdownPlain(detail)
 	confirmationTitle := ahptypes.NewStringOrMarkdownPlain("Allow " + title)
+	permissionMeta := map[string]json.RawMessage{
+		"zaw/permissionRequest": json.RawMessage("true"),
+	}
 	h.emitChatAction(pending.chat, ahptypes.StateAction{
 		Value: &ahptypes.ChatToolCallStartAction{
 			Type:        ahptypes.ActionTypeChatToolCallStart,
@@ -356,6 +378,7 @@ func (h *Host) emitPermissionRequest(
 			ToolCallId:  pending.toolCallID,
 			ToolName:    title,
 			DisplayName: title,
+			Meta:        permissionMeta,
 		},
 	}, nil)
 	h.emitChatAction(pending.chat, ahptypes.StateAction{
@@ -364,16 +387,18 @@ func (h *Host) emitPermissionRequest(
 			TurnId:            pending.turnID,
 			ToolCallId:        pending.toolCallID,
 			InvocationMessage: invocation,
-			ToolInput:         &detail,
+			ToolInput:         stringPointer(rawInput),
 			ConfirmationTitle: &confirmationTitle,
+			Meta:              permissionMeta,
 		},
 	}, nil)
 	toolCall := ahptypes.ToolCallPendingConfirmationState{
 		ToolCallId:        pending.toolCallID,
 		ToolName:          title,
 		DisplayName:       title,
+		Meta:              permissionMeta,
 		InvocationMessage: invocation,
-		ToolInput:         &detail,
+		ToolInput:         stringPointer(rawInput),
 		Status:            ahptypes.ToolCallStatusPendingConfirmation,
 		ConfirmationTitle: &confirmationTitle,
 	}
@@ -394,6 +419,39 @@ func (h *Host) emitPermissionRequest(
 		},
 	}, nil)
 	h.emitSessionSummaryChanged(pending.resource)
+}
+
+func permissionRequestDetail(request agentsdk.PermissionRequest) string {
+	data := map[string]any{}
+	if json.Unmarshal(request.Data, &data) == nil {
+		command := agentEventString(data, "fullCommandText", "command")
+		if command == "" {
+			if commands, ok := data["commands"].([]any); ok {
+				for _, candidate := range commands {
+					command = agentEventString(agentEventMap(candidate), "identifier")
+					if command != "" {
+						break
+					}
+				}
+			}
+		}
+		intention := agentEventString(data, "intention", "description")
+		lines := make([]string, 0, 2)
+		if command != "" {
+			lines = append(lines, "$ "+command)
+		}
+		if intention != "" && intention != command {
+			lines = append(lines, intention)
+		}
+		if len(lines) > 0 {
+			return strings.Join(lines, "\n")
+		}
+	}
+	kind := strings.TrimSpace(request.Kind)
+	if kind == "" {
+		kind = "This action"
+	}
+	return kind + " requires approval."
 }
 
 func (h *Host) emitToolStarted(
@@ -480,9 +538,13 @@ func (h *Host) completeToolCall(
 	if !success {
 		message = "Failed " + toolName
 	}
-	result := agentEventJSON(data["result"])
-	if result == "" {
-		result = agentEventJSON(data["error"])
+	result := agentEventResult(data["result"])
+	errorDetail := agentEventError(data["error"])
+	if !success && errorDetail == "" {
+		errorDetail = agentEventError(data["result"])
+	}
+	if result == "" && errorDetail != "" {
+		result = errorDetail
 	}
 	content := []ahptypes.ToolResultContent{}
 	if result != "" {
@@ -493,18 +555,52 @@ func (h *Host) completeToolCall(
 			},
 		})
 	}
+	toolResult := ahptypes.ToolCallResult{
+		Success:          success,
+		PastTenseMessage: ahptypes.NewStringOrMarkdownPlain(message),
+		Content:          content,
+	}
+	if !success && errorDetail != "" {
+		errorJSON, _ := json.Marshal(map[string]string{"message": errorDetail})
+		rawError := json.RawMessage(errorJSON)
+		toolResult.Error = &rawError
+	}
 	h.emitChatAction(chat, ahptypes.StateAction{
 		Value: &ahptypes.ChatToolCallCompleteAction{
 			Type:       ahptypes.ActionTypeChatToolCallComplete,
 			TurnId:     turnID,
 			ToolCallId: toolCallID,
-			Result: ahptypes.ToolCallResult{
-				Success:          success,
-				PastTenseMessage: ahptypes.NewStringOrMarkdownPlain(message),
-				Content:          content,
-			},
+			Result:     toolResult,
 		},
 	}, nil)
+}
+
+func agentEventError(value any) string {
+	if text, ok := value.(string); ok {
+		return strings.TrimSpace(text)
+	}
+	data := agentEventMap(value)
+	if message := agentEventString(data, "message", "error", "stderr", "output"); message != "" {
+		return message
+	}
+	if cause := data["cause"]; cause != nil {
+		return agentEventError(cause)
+	}
+	if nested := data["error"]; nested != nil {
+		return agentEventError(nested)
+	}
+	return ""
+}
+
+func agentEventResult(value any) string {
+	if text, ok := value.(string); ok {
+		return strings.TrimSpace(text)
+	}
+	data := agentEventMap(value)
+	if text := agentEventString(data, "detailedContent", "content", "output"); text != "" {
+		return text
+	}
+	return agentEventJSON(value)
 }
 
 func (h *Host) hasToolCall(chat ahptypes.URI, toolCallID string) bool {

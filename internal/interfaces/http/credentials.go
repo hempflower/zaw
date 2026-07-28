@@ -69,7 +69,7 @@ func (s *Server) createCredential(w http.ResponseWriter, r *http.Request) {
 	credentialID := id()
 	secretRef := fmt.Sprintf("zaw/credentials/%s", credentialID)
 	if err := s.secrets.Put(r.Context(), secretRef, credentialSecret(input)); err != nil {
-		fail(w, http.StatusBadGateway, fmt.Sprintf("secret manager: %v", err))
+		fail(w, http.StatusInternalServerError, fmt.Sprintf("local secret store: %v", err))
 		return
 	}
 	metadata, _ := json.Marshal(input.Metadata)
@@ -186,7 +186,7 @@ func (s *Server) updateCredential(w http.ResponseWriter, r *http.Request) {
 			credential.SecretRef,
 			credentialSecret(input),
 		); err != nil {
-			fail(w, http.StatusBadGateway, "secret manager could not update credential")
+			fail(w, http.StatusInternalServerError, "local secret store could not update credential")
 			return
 		}
 	}

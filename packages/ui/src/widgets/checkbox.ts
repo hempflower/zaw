@@ -41,7 +41,13 @@ export class CheckboxWidget extends Widget {
     append(
       label,
       input,
-      createElement("span", { textContent: widgetOptions.label }),
+      createElement("span", {
+        className: "zaw-checkbox-box codicon codicon-check",
+      }),
+      createElement("span", {
+        className: "zaw-checkbox-label",
+        textContent: widgetOptions.label,
+      }),
     );
     this.root.replaceChildren(label);
   }

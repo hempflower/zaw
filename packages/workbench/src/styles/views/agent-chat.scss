@@ -1,0 +1,629 @@
+.agent-new-session-view,
+.agent-active-session-view {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  color: var(--zaw-agents-panel-foreground);
+}
+
+.agent-new-session-view[hidden],
+.agent-active-session-view[hidden] {
+  display: none;
+}
+
+.agent-new-session-view {
+  display: grid;
+  overflow: auto;
+  padding: 16px 16px 20px;
+  align-items: center;
+}
+
+.agent-new-session-content {
+  container-type: inline-size;
+  display: grid;
+  width: 100%;
+  max-width: 800px;
+  min-width: 0;
+  gap: 10px;
+  justify-self: center;
+}
+
+.agent-new-session-heading .zaw-picker-action {
+  font-size: inherit;
+}
+
+.agent-composer-notification {
+  padding: 6px 8px;
+  color: var(--zaw-agents-panel-foreground);
+  font-size: var(--zaw-agents-font-size-label1);
+  line-height: 18px;
+  background: color-mix(in srgb, var(--zaw-error) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--zaw-error) 55%, transparent);
+  border-radius: var(--zaw-corner-radius-medium);
+}
+
+.agent-composer-notification[hidden] {
+  display: none;
+}
+
+.agent-composer-notification[data-kind="info"] {
+  background: color-mix(in srgb, var(--zaw-button-background) 10%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--zaw-button-background) 45%,
+    transparent
+  );
+}
+
+.agent-new-session-heading {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+  color: var(--zaw-agents-panel-foreground);
+  font-size: var(--zaw-agents-font-size-heading2);
+  line-height: 24px;
+}
+
+.agent-new-session-heading > span:nth-child(3) {
+  color: var(--zaw-description);
+}
+
+.agent-new-session-heading .zaw-picker-action summary {
+  height: 24px;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.agent-new-session-heading .agent-heading-agent-picker {
+  max-width: 180px;
+  font-size: var(--zaw-agents-font-size-body1);
+
+  summary {
+    height: 22px;
+    min-height: 22px;
+    padding: 1px 4px;
+    font-size: inherit;
+    font-weight: 400;
+  }
+
+  .zaw-picker-action-menu {
+    width: max-content;
+    min-width: 100%;
+    max-width: 220px;
+    padding: 2px;
+    font-size: var(--zaw-agents-font-size-label1);
+  }
+
+  .zaw-dropdown-item {
+    height: 22px;
+    min-height: 22px;
+    padding: 0 6px;
+    line-height: 22px;
+    white-space: nowrap;
+  }
+}
+
+.agent-chat-composer {
+  --zaw-agent-composer-working-border-color: var(
+    --zaw-agents-chat-input-focus-border
+  );
+  --zaw-agent-composer-working-border-duration: 1.8s;
+  position: relative;
+  container-type: inline-size;
+  box-sizing: border-box;
+  display: grid;
+  min-width: 0;
+  color: var(--zaw-agents-chat-input-foreground);
+  background: var(--zaw-agents-chat-input-background);
+  border: 1px solid var(--zaw-agents-chat-input-border);
+  border-radius: var(--zaw-corner-radius-large);
+}
+
+// Ported from VS Code's chat input progress border: a sharp conic-gradient
+// beam and a softer blurred glow share the same animated angle.
+@property --zaw-agent-composer-working-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+
+@keyframes zaw-agent-composer-working-border-spin {
+  from {
+    --zaw-agent-composer-working-border-angle: 135deg;
+  }
+
+  to {
+    --zaw-agent-composer-working-border-angle: 495deg;
+  }
+}
+
+.agent-chat-composer::before,
+.agent-chat-composer::after {
+  position: absolute;
+  inset: -1px;
+  content: "";
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 350ms ease;
+}
+
+.agent-chat-composer::before {
+  z-index: 2;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--zaw-agent-composer-working-border-angle),
+    transparent 0deg,
+    color-mix(
+        in srgb,
+        var(--zaw-agent-composer-working-border-color) 90%,
+        transparent
+      )
+      20deg,
+    var(--zaw-agent-composer-working-border-color) 30deg,
+    color-mix(
+        in srgb,
+        var(--zaw-agent-composer-working-border-color) 60%,
+        transparent
+      )
+      50deg,
+    transparent 90deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  mask-composite: exclude;
+}
+
+.agent-chat-composer::after {
+  z-index: 1;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--zaw-agent-composer-working-border-angle),
+    transparent 0deg,
+    color-mix(
+        in srgb,
+        var(--zaw-agent-composer-working-border-color) 60%,
+        transparent
+      )
+      25deg,
+    color-mix(
+        in srgb,
+        var(--zaw-agent-composer-working-border-color) 35%,
+        transparent
+      )
+      50deg,
+    transparent 90deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  mask-composite: exclude;
+  filter: blur(1.5px);
+}
+
+.agent-composer-attachment-item {
+  display: contents;
+}
+
+.agent-composer-file-input {
+  display: none;
+}
+
+.agent-composer-drop-overlay {
+  position: absolute;
+  z-index: 3;
+  inset: 4px;
+  display: none;
+  place-items: center;
+  color: var(--zaw-agents-panel-foreground);
+  background: color-mix(
+    in srgb,
+    var(--zaw-agents-chat-input-background) 88%,
+    transparent
+  );
+  border: 1px dashed var(--zaw-agents-chat-input-focus-border);
+  border-radius: var(--zaw-corner-radius-medium);
+  pointer-events: none;
+}
+
+.agent-chat-composer.dragging-files .agent-composer-drop-overlay {
+  display: grid;
+}
+
+.agent-composer-attachments {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  padding: 6px 6px 0;
+  overflow-x: auto;
+}
+
+.agent-composer-attachments[hidden] {
+  display: none;
+}
+
+.agent-composer-attachment {
+  box-sizing: border-box;
+  display: inline-flex;
+  max-width: 200px;
+  height: 18px;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  padding: 0 4px;
+  color: var(--zaw-agents-chat-input-foreground);
+  font: inherit;
+  font-size: var(--zaw-agents-font-size-label2);
+  background: var(--zaw-list-active-background);
+  border: 1px solid transparent;
+  border-radius: var(--zaw-corner-radius-small);
+}
+
+.agent-composer-attachment:hover {
+  background: var(--zaw-list-hover-background);
+}
+
+.agent-composer-attachment:focus-visible {
+  border-color: var(--zaw-focus-border);
+  outline: 0;
+}
+
+.agent-composer-attachment > .codicon {
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.agent-composer-attachment-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-composer-attachment-remove {
+  opacity: 0.7;
+}
+
+.agent-chat-composer:focus-within {
+  border-color: var(--zaw-agents-chat-input-focus-border);
+}
+
+.agent-chat-composer[data-working="true"]:not(:focus-within) {
+  border-color: var(--zaw-agents-chat-input-border);
+}
+
+.agent-chat-composer[data-working="true"]:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--zaw-agents-chat-input-focus-border) 40%,
+    transparent
+  );
+}
+
+.agent-chat-composer[data-working="true"] {
+  overflow: visible;
+}
+
+.agent-chat-composer[data-working="true"]::before,
+.agent-chat-composer[data-working="true"]::after {
+  opacity: 1;
+  animation: zaw-agent-composer-working-border-spin
+    var(--zaw-agent-composer-working-border-duration) linear infinite;
+}
+
+.agent-chat-composer[data-working="true"].agent-composer-working-border-restart::before,
+.agent-chat-composer[data-working="true"].agent-composer-working-border-restart::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-chat-composer[data-working="true"]::before,
+  .agent-chat-composer[data-working="true"]::after {
+    animation: none;
+  }
+}
+
+.agent-composer-editor {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  max-height: 180px;
+  padding: 10px 10px 2px;
+  resize: none;
+  overflow-y: auto;
+  color: inherit;
+  font: inherit;
+  line-height: 20px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.agent-composer-editor::placeholder {
+  color: var(--zaw-agents-chat-input-placeholder);
+}
+
+.agent-composer-config-toolbar {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 6px 6px;
+}
+
+.agent-composer-picker-host {
+  min-width: 0;
+}
+
+.agent-composer-picker-host .zaw-picker-action-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-model-picker .zaw-picker-action-menu {
+  width: max(240px, 100%);
+  max-width: min(320px, calc(100vw - 24px));
+}
+
+.agent-mode-picker .zaw-picker-action-menu {
+  width: max(112px, 100%);
+}
+
+.agent-mode-picker .zaw-dropdown-item {
+  min-height: 24px;
+  padding-block: 2px;
+}
+
+.agent-model-picker .zaw-dropdown-item,
+.agent-reasoning-picker .zaw-dropdown-item {
+  min-height: 24px;
+  padding-block: 2px;
+}
+
+.agent-model-picker .zaw-dropdown-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.agent-model-picker .zaw-dropdown-item-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.agent-model-picker .zaw-dropdown-item-content > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-model-picker .zaw-dropdown-item small {
+  flex: 0 1 auto;
+  max-width: 42%;
+  overflow: hidden;
+  color: var(--zaw-description);
+  text-overflow: ellipsis;
+}
+
+.agent-reasoning-picker .zaw-picker-action-menu {
+  width: max(140px, 100%);
+}
+
+.agent-composer-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.agent-composer-send {
+  flex: 0 0 22px;
+}
+
+.zaw-workbench .agent-primary-send-action {
+  color: var(--zaw-button-foreground);
+  background: var(--zaw-button-background);
+}
+
+.zaw-workbench .agent-primary-send-action:hover:not(:disabled) {
+  background: var(--zaw-button-hover-background);
+}
+
+.zaw-workbench .agent-primary-send-action:disabled {
+  color: var(--zaw-disabled-foreground);
+  background: color-mix(in srgb, var(--zaw-button-background) 35%, transparent);
+}
+
+.agent-new-session-controls,
+.agent-session-context-line {
+  display: flex;
+  min-width: 0;
+  min-height: 22px;
+  gap: 12px;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--zaw-description);
+  font-size: var(--zaw-agents-font-size-label2);
+}
+
+.agent-new-session-status,
+.agent-session-context-status {
+  overflow: hidden;
+  gap: 5px;
+  align-items: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-workspace-state-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+}
+
+.agent-workspace-transition {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: var(--zaw-description);
+}
+
+.agent-workspace-action.state-start .zaw-action {
+  color: var(--zaw-success);
+}
+
+.agent-workspace-action.state-stop .zaw-action {
+  color: var(--zaw-error);
+}
+
+.agent-workspace-action.state-start .zaw-action:hover {
+  background: color-mix(in srgb, var(--zaw-success) 14%, transparent);
+}
+
+.agent-workspace-action.state-stop .zaw-action:hover {
+  background: color-mix(in srgb, var(--zaw-error) 14%, transparent);
+}
+
+.agent-new-session-controls,
+.agent-session-context-line {
+  overflow: visible;
+}
+
+.agent-new-session-status {
+  display: inline-flex;
+}
+
+.agent-session-context-status {
+  display: inline-flex;
+  flex: 0 1 auto;
+}
+
+.agent-control-picker {
+  min-width: 0;
+  font-size: var(--zaw-agents-font-size-label2);
+}
+
+.agent-active-session-view {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.agent-conversation-transcript {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.agent-chat-scroll-down {
+  z-index: 2;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: end;
+  justify-self: end;
+  margin-right: max(
+    32px,
+    calc((100% - var(--zaw-session-content-max-width, 950px)) / 2 + 32px)
+  );
+  margin-bottom: 8px;
+}
+
+.agent-chat-scroll-down[hidden] {
+  display: none;
+}
+
+.agent-chat-scroll-down .zaw-action {
+  color: var(--zaw-agents-panel-foreground);
+  background: var(--zaw-agents-panel-background);
+  border: 1px solid var(--zaw-agents-panel-border);
+  border-radius: var(--zaw-corner-radius-circle);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--zaw-shadow) 35%, transparent);
+}
+
+.agent-conversation-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 950px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.agent-conversation-content .session-event {
+  margin: 0 0 18px;
+  color: var(--zaw-agents-panel-foreground);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.agent-conversation-content .session-event.message:first-child {
+  margin-top: 0;
+}
+
+.agent-conversation-content .session-event.error {
+  color: var(--zaw-error);
+}
+
+.agent-conversation-empty {
+  display: grid;
+  min-height: 50vh;
+  margin: 0;
+  place-items: center;
+  color: var(--zaw-description);
+}
+
+.agent-active-composer-lane {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  max-width: 950px;
+  grid-column: 1;
+  grid-row: 2;
+  gap: 4px;
+  margin: 0 auto;
+  padding: 4px 32px 12px;
+}
+
+@container (max-width: 330px) {
+  .agent-composer-picker-host:not(.agent-permission-picker)
+    .zaw-picker-action-label {
+    display: none;
+  }
+}
+
+@container (max-width: 240px) {
+  .agent-permission-picker .zaw-picker-action-label {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .agent-new-session-view {
+    align-items: start;
+  }
+}
+
+@media (forced-colors: active) {
+  .agent-chat-composer,
+  .agent-chat-composer:focus-within {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+}

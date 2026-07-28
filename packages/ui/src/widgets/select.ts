@@ -85,6 +85,7 @@ export class SelectWidget extends Widget {
         if (!option) return;
         this.setValue(option.value);
         renderedDetails?.removeAttribute("open");
+        renderedDetails?.querySelector<HTMLElement>("summary")?.focus();
         this._onDidSelect.fire({ value: option.value, option, event });
       },
       undefined,

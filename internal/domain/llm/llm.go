@@ -5,7 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 )
+
+// ModelIdentifier is the stable, public model identity used by agent clients.
+// Persistence IDs remain private to the management API.
+func ModelIdentifier(provider Provider, model Model) string {
+	return strings.TrimSpace(provider.ID) + "/" + strings.TrimSpace(model.UpstreamModel)
+}
 
 type ProviderKind string
 
@@ -48,6 +55,7 @@ type Model struct {
 
 type Capabilities struct {
 	TextInput              bool     `json:"textInput"`
+	ContextWindow          int      `json:"contextWindow"`
 	ImageInput             bool     `json:"imageInput"`
 	AudioInput             bool     `json:"audioInput"`
 	FileInput              bool     `json:"fileInput"`

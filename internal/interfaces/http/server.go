@@ -41,6 +41,7 @@ type Server struct {
 	workspaceLife  workspaceservice.Service
 	models         *llmservice.Service
 	sessions       *sessionservice.Service
+	auth           authentication
 }
 
 func New(
@@ -93,6 +94,10 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	return s.seedDevelopmentIdentity(ctx)
 }
 
+func (s *Server) ConfigureAuthentication(password, provisionerKey, signingKey string) {
+	s.auth.configure(password, provisionerKey, signingKey)
+}
+
 func (s *Server) Handler() http.Handler { return s.routes() }
 
 // CloseAHP releases live Host sockets during a control-plane shutdown.
@@ -134,52 +139,65 @@ func (s *Server) routes() http.Handler {
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	router.Get("/downloads/zaw/{goos}/{goarch}", s.agentHostRuntimeDownload)
+	router.Head("/downloads/zaw/{goos}/{goarch}", s.agentHostRuntimeDownload)
+	router.Get("/api/v1/auth/status", s.auth.status)
+	router.Post("/api/v1/auth/login", s.auth.login)
+	router.Post("/api/v1/auth/logout", s.auth.logout)
 	router.Route("/api/v1", func(api chi.Router) {
-		api.Get("/me", s.me)
-		api.Get("/templates", s.templates)
-		api.Post("/templates", s.templates)
-		api.Get("/templates/{id}", s.template)
-		api.Patch("/templates/{id}", s.template)
-		api.Delete("/templates/{id}", s.template)
-		api.Get("/credentials", s.credentials)
-		api.Post("/credentials", s.credentials)
-		api.Patch("/credentials/{id}", s.credential)
-		api.Delete("/credentials/{id}", s.credential)
-		api.Get("/model-providers", s.modelProviders)
-		api.Post("/model-providers", s.modelProviders)
-		api.Patch("/model-providers/{id}", s.modelProvider)
-		api.Delete("/model-providers/{id}", s.modelProvider)
-		api.Get("/models", s.modelConfigurations)
-		api.Post("/models", s.modelConfigurations)
-		api.Patch("/models/{id}", s.modelConfiguration)
-		api.Delete("/models/{id}", s.modelConfiguration)
-		api.Get("/workspaces", s.workspaces)
-		api.Post("/workspaces", s.workspaces)
-		api.Get("/workspaces/{id}", s.workspace)
-		api.Post("/workspaces/{id}/builds", s.workspaceBuilds)
-		api.Get("/builds/{id}", s.build)
-		api.Get("/builds/{id}/logs", s.buildLogs)
-		api.Get("/builds", s.listBuilds)
-		api.Get("/provisioners", s.provisioners)
-		api.Get("/provisioner-jobs", s.provisionerJobs)
-		api.Post("/provisioners/register", s.registerProvisioner)
-		api.Post("/provisioners/{id}/heartbeat", s.provisionerHeartbeat)
-		api.Post("/provisioners/{id}/claim", s.claimJob)
-		api.Post("/provisioners/{id}/jobs/{jobID}/events", s.jobEvent)
-		api.Post(
-			"/provisioners/{id}/jobs/{jobID}/credentials/{credentialID}/lease",
-			s.credentialLease,
-		)
-		api.Post("/provisioners/{id}/jobs/{jobID}/agent-host-token", s.agentHostToken)
+		api.Group(func(provisioner chi.Router) {
+			provisioner.Use(s.auth.requireProvisioner)
+			provisioner.Post("/provisioners/register", s.registerProvisioner)
+			provisioner.Post("/provisioners/{id}/heartbeat", s.provisionerHeartbeat)
+			provisioner.Post("/provisioners/{id}/claim", s.claimJob)
+			provisioner.Post("/provisioners/{id}/jobs/{jobID}/events", s.jobEvent)
+			provisioner.Post(
+				"/provisioners/{id}/jobs/{jobID}/credentials/{credentialID}/secret",
+				s.buildCredentialSecret,
+			)
+			provisioner.Post("/provisioners/{id}/jobs/{jobID}/agent-host-token", s.agentHostToken)
+		})
 		api.Post("/agent-hosts/{workspaceID}/telemetry", s.telemetry)
 		api.Get("/agent-hosts/{workspaceID}/model", s.agentHostModel)
+		api.Get("/agent-hosts/{workspaceID}/runtime", s.agentHostRuntime)
+		api.Head("/agent-hosts/{workspaceID}/runtime", s.agentHostRuntime)
 		api.Get("/agent-hosts/{workspaceID}/ahp", s.agentHostAHP)
-		api.Get("/workspaces/{workspaceID}/ahp", s.workspaceAHP)
-		api.Get("/sessions", s.sessionCatalog)
 		api.Get("/llm/models", s.llmModels)
 		api.Post("/llm/generate", s.generateModel)
 		api.Post("/llm/openai/responses", s.openAIResponses)
 		api.Post("/llm/openai/v1/responses", s.openAIResponses)
+		api.Group(func(api chi.Router) {
+			api.Use(s.auth.requireUser)
+			api.Get("/me", s.me)
+			api.Get("/templates", s.templates)
+			api.Post("/templates", s.templates)
+			api.Get("/templates/{id}", s.template)
+			api.Patch("/templates/{id}", s.template)
+			api.Delete("/templates/{id}", s.template)
+			api.Get("/credentials", s.credentials)
+			api.Post("/credentials", s.credentials)
+			api.Patch("/credentials/{id}", s.credential)
+			api.Delete("/credentials/{id}", s.credential)
+			api.Get("/model-providers", s.modelProviders)
+			api.Post("/model-providers", s.modelProviders)
+			api.Patch("/model-providers/{id}", s.modelProvider)
+			api.Delete("/model-providers/{id}", s.modelProvider)
+			api.Get("/models", s.modelConfigurations)
+			api.Post("/models", s.modelConfigurations)
+			api.Patch("/models/{id}", s.modelConfiguration)
+			api.Delete("/models/{id}", s.modelConfiguration)
+			api.Get("/workspaces", s.workspaces)
+			api.Post("/workspaces", s.workspaces)
+			api.Get("/workspaces/{id}", s.workspace)
+			api.Post("/workspaces/{id}/builds", s.workspaceBuilds)
+			api.Get("/builds/{id}", s.build)
+			api.Get("/builds/{id}/logs", s.buildLogs)
+			api.Get("/builds", s.listBuilds)
+			api.Get("/provisioners", s.provisioners)
+			api.Get("/provisioner-jobs", s.provisionerJobs)
+			api.Get("/workspaces/{workspaceID}/ahp", s.workspaceAHP)
+			api.Get("/sessions", s.sessionCatalog)
+		})
 	})
 	static, _ := fs.Sub(web, "web")
 	router.Handle("/*", http.FileServer(http.FS(static)))

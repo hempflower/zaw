@@ -41,6 +41,7 @@ func main() {
 	case "provisioner":
 		flags := flag.NewFlagSet("provisioner", flag.ExitOnError)
 		serverURL := flags.String("server", "", "Server HTTP URL")
+		key := flags.String("key", "", "Provisioner connection key")
 		name := flags.String("name", "", "Provisioner name")
 		workRoot := flags.String("work-root", "", "Provisioner working directory")
 		terraformBinary := flags.String("terraform", "", "Terraform executable")
@@ -57,16 +58,11 @@ func main() {
 			"",
 			"Incus CLI used for Agent Host credential injection",
 		)
-		agentHostBinary := flags.String(
-			"agent-host-binary",
-			"",
-			"local zaw binary injected into Incus VMs",
-		)
-		stateEndpoint := flags.String("state-s3-endpoint", "", "Terraform S3 endpoint")
-		stateBucket := flags.String("state-s3-bucket", "", "Terraform S3 bucket")
+		stateDirectory := flags.String("state-dir", "", "Terraform state directory")
 		_ = flags.Parse(os.Args[2:])
 		app := bootstrap.NewProvisionerApp(provisioner.Config{
 			ServerURL:                   *serverURL,
+			Key:                         *key,
 			Name:                        *name,
 			WorkRoot:                    *workRoot,
 			TerraformBinary:             *terraformBinary,
@@ -75,9 +71,7 @@ func main() {
 			RetainFailedWorkDirectories: *retainFailed,
 			DockerHost:                  *dockerHost,
 			IncusBinary:                 *incusBinary,
-			AgentHostBinary:             *agentHostBinary,
-			StateEndpoint:               *stateEndpoint,
-			StateBucket:                 *stateBucket,
+			StateDirectory:              *stateDirectory,
 		})
 		err = runApp(ctx, app, true)
 	case "agent-host":
@@ -86,6 +80,8 @@ func main() {
 		workspaceID := flags.String("workspace-id", "", "Workspace identifier")
 		agentProvider := flags.String("agent-provider", "", "Agent SDK provider")
 		copilotCLIPath := flags.String("copilot-cli", "", "GitHub Copilot CLI executable")
+		autoUpdate := flags.Bool("auto-update", true, "update the Agent Host from the control plane")
+		updateInterval := flags.Duration("update-interval", 0, "Agent Host update check interval")
 		workspaceDir := flags.String("workspace-dir", "", "Workspace working directory")
 		registrationTokenFile := flags.String(
 			"registration-token-file",
@@ -97,7 +93,9 @@ func main() {
 			ServerURL:             *serverURL,
 			WorkspaceID:           *workspaceID,
 			AgentProvider:         *agentProvider,
+			AutoUpdate:            *autoUpdate,
 			CopilotCLIPath:        *copilotCLIPath,
+			UpdateInterval:        *updateInterval,
 			WorkspaceDir:          *workspaceDir,
 			RegistrationTokenFile: *registrationTokenFile,
 		})

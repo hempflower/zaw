@@ -13,7 +13,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/zaw-dev/zaw/internal/domain"
 	"github.com/zaw-dev/zaw/internal/infra/agentidentity"
-	"github.com/zaw-dev/zaw/internal/infra/secret/openbao"
+	"github.com/zaw-dev/zaw/internal/infra/secret/localfs"
 	"github.com/zaw-dev/zaw/internal/infra/source"
 	httptransport "github.com/zaw-dev/zaw/internal/interfaces/http"
 	"go.uber.org/fx"
@@ -54,8 +54,8 @@ func loadEnvironment() (environment, error) {
 	return environment{}, nil
 }
 
-func newSecretStore(environment) domain.SecretStore {
-	return openbao.NewClient()
+func newSecretStore(environment) (domain.SecretStore, error) {
+	return localfs.New(os.Getenv("ZAW_SECRET_STORE_DIR"))
 }
 
 func newAgentHostIdentity(environment) (domain.AgentHostIdentity, error) {
@@ -100,6 +100,19 @@ func bootstrapServer(
 	serverConfig ServerConfig,
 	controlPlane *httptransport.Server,
 ) error {
+	password := os.Getenv("ZAW_PASSWORD")
+	if password == "" {
+		return fmt.Errorf("ZAW_PASSWORD is required")
+	}
+	provisionerKey := os.Getenv("ZAW_PROVISIONER_KEY")
+	if provisionerKey == "" {
+		return fmt.Errorf("ZAW_PROVISIONER_KEY is required")
+	}
+	authSigningKey := os.Getenv("ZAW_AUTH_SIGNING_KEY")
+	if len(authSigningKey) < 32 {
+		return fmt.Errorf("ZAW_AUTH_SIGNING_KEY must be at least 32 characters")
+	}
+	controlPlane.ConfigureAuthentication(password, provisionerKey, authSigningKey)
 	if err := controlPlane.Bootstrap(context.Background()); err != nil {
 		return err
 	}

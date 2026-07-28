@@ -13,6 +13,71 @@ import (
 	"github.com/zaw-dev/zaw/internal/agenthost/agentsdk"
 )
 
+func TestPromptRequestReadsReasoningEffortMetadata(t *testing.T) {
+	effort, err := json.Marshal("high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := promptRequest(ahptypes.Message{
+		Text: "reason deeply",
+		Meta: map[string]json.RawMessage{"zaw/reasoningEffort": effort},
+	})
+	if request.ReasoningEffort != "high" {
+		t.Fatalf("reasoning effort = %q", request.ReasoningEffort)
+	}
+}
+
+func TestPermissionRequestDetailFormatsShellCommand(t *testing.T) {
+	detail := permissionRequestDetail(agentsdk.PermissionRequest{
+		Kind: "shell",
+		Data: json.RawMessage(`{
+			"fullCommandText":"curl -sI https://example.com",
+			"intention":"Check connectivity"
+		}`),
+	})
+	want := "$ curl -sI https://example.com\nCheck connectivity"
+	if detail != want {
+		t.Fatalf("permission detail = %q, want %q", detail, want)
+	}
+}
+
+func TestAgentEventErrorPreservesNestedFailureReason(t *testing.T) {
+	got := agentEventError(map[string]any{
+		"error": map[string]any{"message": "connection refused"},
+	})
+	if got != "connection refused" {
+		t.Fatalf("error detail = %q, want connection refused", got)
+	}
+}
+
+func TestPromptRequestPreservesEmbeddedAttachmentBase64(t *testing.T) {
+	request := promptRequest(ahptypes.Message{
+		Text: "inspect this",
+		Attachments: []ahptypes.MessageAttachment{{
+			Value: &ahptypes.MessageEmbeddedResourceAttachment{
+				Type:  ahptypes.MessageAttachmentKindEmbeddedResource,
+				Label: "note.txt", Data: "aGVsbG8=", ContentType: "text/plain",
+			},
+		}},
+	})
+	if len(request.Attachments) != 1 || request.Attachments[0].Data != "aGVsbG8=" {
+		t.Fatalf("embedded attachment was not preserved: %#v", request.Attachments)
+	}
+}
+
+func TestPromptRequestUsesExplicitPlanMode(t *testing.T) {
+	request := promptRequest(ahptypes.Message{
+		Text: "plan this change",
+		Meta: map[string]json.RawMessage{
+			"zaw/agentMode":    json.RawMessage(`"plan"`),
+			"zaw/approvalMode": json.RawMessage(`"autopilot"`),
+		},
+	})
+	if request.AgentMode != "plan" {
+		t.Fatalf("agent mode = %q, want plan", request.AgentMode)
+	}
+}
+
 func TestHostCreatesSessionWithoutPersistentStorage(t *testing.T) {
 	host := NewWithAgent(&testAgentRuntime{}, "")
 	response, notification := host.handle([]byte(`{

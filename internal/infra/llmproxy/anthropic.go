@@ -56,6 +56,11 @@ func anthropicRequest(
 		if role == "tool" {
 			role = "user"
 		}
+		if len(messages) != 0 && stringValue(messages[len(messages)-1], "role") == role {
+			previous, _ := messages[len(messages)-1]["content"].([]map[string]any)
+			messages[len(messages)-1]["content"] = append(previous, content...)
+			continue
+		}
 		messages = append(messages, map[string]any{"role": role, "content": content})
 	}
 	maxTokens := request.MaxOutputTokens
@@ -309,7 +314,13 @@ func consumeAnthropicDelta(
 		part.Signature += stringValue(delta, "signature")
 	case "input_json_delta":
 		arguments := stringValue(delta, "partial_json")
-		part.ToolCall.Arguments = append(part.ToolCall.Arguments, arguments...)
+		if part.ToolCall == nil {
+			return
+		}
+		arguments = appendToolArguments(part.ToolCall, arguments)
+		if arguments == "" {
+			return
+		}
 		events <- domainllm.Event{
 			Type: "output.tool_call.arguments.delta", ResponseID: state.id,
 			OutputIndex: index, Delta: arguments,

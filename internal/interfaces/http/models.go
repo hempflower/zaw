@@ -10,6 +10,7 @@ import (
 )
 
 type modelProviderInput struct {
+	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Kind    string `json:"kind"`
 	APIBase string `json:"apiBase"`
@@ -200,9 +201,38 @@ func (s *Server) agentHostModel(w http.ResponseWriter, r *http.Request) {
 		handleModelError(w, err)
 		return
 	}
+	models, err := s.models.ListModels(r.Context(), devOrganizationID)
+	if err != nil {
+		handleModelError(w, err)
+		return
+	}
+	providers, err := s.models.ListProviders(r.Context(), devOrganizationID)
+	if err != nil {
+		handleModelError(w, err)
+		return
+	}
+	providersByID := make(map[string]domainllm.Provider, len(providers))
+	for _, provider := range providers {
+		providersByID[provider.ID] = provider
+	}
+	catalog := make([]map[string]any, 0, len(models))
+	for _, model := range models {
+		provider, ok := providersByID[model.ProviderID]
+		if !ok {
+			continue
+		}
+		catalog = append(catalog, map[string]any{
+			"id":           domainllm.ModelIdentifier(provider, model),
+			"name":         model.Name,
+			"vendor":       string(provider.Kind),
+			"capabilities": model.Capabilities,
+		})
+	}
+	modelID := domainllm.ModelIdentifier(selection.Provider, selection.Model)
 	respond(w, http.StatusOK, map[string]any{
-		"id":           selection.Model.ID,
-		"model":        selection.Model.Name,
+		"id":           modelID,
+		"model":        modelID,
+		"models":       catalog,
 		"provider":     string(selection.Provider.Kind),
 		"capabilities": selection.Model.Capabilities,
 	})
@@ -225,7 +255,8 @@ func (s *Server) llmModels(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, http.StatusOK, map[string]any{
 		"items": []map[string]any{{
-			"id": selection.Model.ID, "name": selection.Model.Name,
+			"id":           domainllm.ModelIdentifier(selection.Provider, selection.Model),
+			"name":         selection.Model.Name,
 			"capabilities": selection.Model.Capabilities,
 		}},
 	})
@@ -298,7 +329,7 @@ func writeGeneration(
 
 func providerServiceInput(input modelProviderInput) llmservice.ProviderInput {
 	return llmservice.ProviderInput{
-		Name: input.Name, Kind: domainllm.ProviderKind(input.Kind),
+		ID: input.ID, Name: input.Name, Kind: domainllm.ProviderKind(input.Kind),
 		APIBase: input.APIBase, APIKey: input.APIKey,
 	}
 }

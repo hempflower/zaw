@@ -10,6 +10,13 @@ import (
 	domainllm "github.com/zaw-dev/zaw/internal/domain/llm"
 )
 
+const reasoningEnvelopePrefix = "zaw-reasoning-v1."
+
+type reasoningEnvelope struct {
+	Text      string `json:"text"`
+	Signature string `json:"signature,omitempty"`
+}
+
 type openAIResponsesRequest struct {
 	Model        string          `json:"model"`
 	Instructions json.RawMessage `json:"instructions"`
@@ -50,11 +57,13 @@ func (s *Server) openAIResponses(w http.ResponseWriter, r *http.Request) {
 	}
 	var wireRequest openAIResponsesRequest
 	if err := decodeOpenAIResponsesRequest(r, &wireRequest); err != nil {
+		s.logger.Warn("decode Copilot Responses request", "error", err)
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	request, err := responsesRequestToNeutral(wireRequest)
 	if err != nil {
+		s.logger.Warn("convert Copilot Responses request", "error", err)
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -65,6 +74,7 @@ func (s *Server) openAIResponses(w http.ResponseWriter, r *http.Request) {
 		request,
 	)
 	if err != nil {
+		s.logger.Warn("route Copilot Responses request", "error", err)
 		handleModelError(w, err)
 		return
 	}
@@ -86,9 +96,7 @@ func decodeOpenAIResponsesRequest(
 	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(request)
+	return json.Unmarshal(payload, request)
 }
 
 func responsesRequestToNeutral(
@@ -161,10 +169,10 @@ func responsesInputToNeutral(input json.RawMessage) ([]domainllm.Message, error)
 			if err != nil {
 				return nil, err
 			}
-			messages = append(messages, message)
+			messages = appendResponsesMessage(messages, message)
 		case "function_call":
 			arguments := json.RawMessage(stringValue(item, "arguments"))
-			messages = append(messages, domainllm.Message{
+			messages = appendResponsesMessage(messages, domainllm.Message{
 				Role: "assistant",
 				ToolCalls: []domainllm.ToolCall{{
 					ID: stringValue(item, "call_id"), Name: stringValue(item, "name"),
@@ -179,12 +187,26 @@ func responsesInputToNeutral(input json.RawMessage) ([]domainllm.Message, error)
 				}},
 			})
 		case "reasoning":
-			messages = append(messages, reasoningMessage(item))
+			messages = appendResponsesMessage(messages, reasoningMessage(item))
 		default:
 			return nil, fmt.Errorf("unsupported Responses input item")
 		}
 	}
 	return messages, nil
+}
+
+func appendResponsesMessage(
+	messages []domainllm.Message,
+	message domainllm.Message,
+) []domainllm.Message {
+	if message.Role != "assistant" || len(messages) == 0 ||
+		messages[len(messages)-1].Role != "assistant" {
+		return append(messages, message)
+	}
+	last := &messages[len(messages)-1]
+	last.Content = append(last.Content, message.Content...)
+	last.ToolCalls = append(last.ToolCalls, message.ToolCalls...)
+	return messages
 }
 
 func responsesMessageToNeutral(item map[string]any) (domainllm.Message, error) {
@@ -257,6 +279,25 @@ func sourceFromWireURL(value string) domainllm.ContentSource {
 
 func reasoningMessage(item map[string]any) domainllm.Message {
 	message := domainllm.Message{Role: "assistant"}
+	if envelope, ok := decodeReasoningEnvelope(stringValue(item, "encrypted_content")); ok {
+		message.Content = []domainllm.ContentPart{{
+			Type: "reasoning", Text: envelope.Text, Signature: envelope.Signature,
+			Metadata: rawJSON(item),
+		}}
+		return message
+	}
+	content, _ := item["content"].([]any)
+	for _, rawPart := range content {
+		part, _ := rawPart.(map[string]any)
+		if stringValue(part, "type") == "reasoning_text" {
+			message.Content = append(message.Content, domainllm.ContentPart{
+				Type: "reasoning", Text: stringValue(part, "text"), Metadata: rawJSON(item),
+			})
+		}
+	}
+	if len(message.Content) != 0 {
+		return message
+	}
 	summary, _ := item["summary"].([]any)
 	for _, rawPart := range summary {
 		part, _ := rawPart.(map[string]any)
@@ -265,6 +306,27 @@ func reasoningMessage(item map[string]any) domainllm.Message {
 		})
 	}
 	return message
+}
+
+func encodeReasoningEnvelope(part domainllm.OutputPart) string {
+	payload, _ := json.Marshal(reasoningEnvelope{Text: part.Text, Signature: part.Signature})
+	return reasoningEnvelopePrefix + base64.RawURLEncoding.EncodeToString(payload)
+}
+
+func decodeReasoningEnvelope(value string) (reasoningEnvelope, bool) {
+	if !strings.HasPrefix(value, reasoningEnvelopePrefix) {
+		return reasoningEnvelope{}, false
+	}
+	encoded := strings.TrimPrefix(value, reasoningEnvelopePrefix)
+	payload, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return reasoningEnvelope{}, false
+	}
+	var envelope reasoningEnvelope
+	if json.Unmarshal(payload, &envelope) != nil {
+		return reasoningEnvelope{}, false
+	}
+	return envelope, true
 }
 
 func responsesToolChoice(raw json.RawMessage) *domainllm.ToolChoice {
@@ -459,7 +521,9 @@ func responsesOutput(parts []domainllm.OutputPart) []map[string]any {
 		case "reasoning":
 			result = append(result, map[string]any{
 				"id": fmt.Sprintf("rs_%d", index), "type": "reasoning",
-				"summary": []map[string]any{{"type": "summary_text", "text": part.Text}},
+				"summary":           []map[string]any{{"type": "summary_text", "text": part.Text}},
+				"content":           []map[string]any{{"type": "reasoning_text", "text": part.Text}},
+				"encrypted_content": encodeReasoningEnvelope(part), "status": "completed",
 			})
 		case "tool_call":
 			result = append(result, map[string]any{

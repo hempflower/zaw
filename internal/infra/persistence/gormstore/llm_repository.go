@@ -252,7 +252,7 @@ func (r *LLMRepository) ResolveWorkspace(
 	if workspace.ModelID != "" {
 		query = query.Where("llm_models.id = ?", workspace.ModelID)
 	} else {
-		query = query.Where("llm_models.is_default = ?", true)
+		query = query.Order("llm_models.is_default DESC, llm_models.created_at ASC")
 	}
 	var modelRow LLMModel
 	if err := query.First(&modelRow).Error; errors.Is(err, gorm.ErrRecordNotFound) {

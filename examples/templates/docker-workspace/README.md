@@ -5,7 +5,7 @@ development container and returns its ID and name as Workspace resources. Its
 home volume is persistent; `stop` sets the existing container's `must_run`
 property to false, while `delete` runs Terraform destroy.
 
-The Provisioner configures the empty S3 backend using `ZAW_STATE_S3_*` values.
+The Provisioner configures the local backend under `ZAW_TERRAFORM_STATE_DIR`.
 Do not put backend credentials in this template or commit a local state file.
 
 Publish this directory in a Git repository, then add it through Settings using
@@ -31,3 +31,5 @@ zaw_copilot_cli_path = "/usr/local/bin/copilot"
 
 Keeping the executable image-specific makes the template portable and avoids
 putting a privileged Docker socket or model credentials into Terraform state.
+The container supervises the command and enables authenticated runtime updates;
+after an atomic update the Agent Host exits and the loop starts the new binary.

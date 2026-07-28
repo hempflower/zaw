@@ -274,7 +274,10 @@ func consumeChatToolDeltas(
 			}
 		}
 		if arguments := stringValue(function, "arguments"); arguments != "" {
-			call.Arguments = append(call.Arguments, arguments...)
+			arguments = appendToolArguments(call, arguments)
+			if arguments == "" {
+				continue
+			}
 			events <- domainllm.Event{
 				Type: "output.tool_call.arguments.delta", ResponseID: state.id,
 				OutputIndex: outputIndex, Delta: arguments,

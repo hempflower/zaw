@@ -90,6 +90,17 @@ func TestAgentHostTelemetryUsesRegistrationCredential(t *testing.T) {
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("telemetry response = %d: %s", recorder.Code, recorder.Body.String())
 	}
+	request = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/agent-hosts/workspace-telemetry/telemetry",
+		strings.NewReader(`{"health":"ok","cpuPercent":2.5,"memoryBytes":4096}`),
+	)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("second telemetry response = %d: %s", recorder.Code, recorder.Body.String())
+	}
 	var host storage.AgentHost
 	err = database.
 		Where("workspace_id = ?", "workspace-telemetry").
@@ -97,8 +108,16 @@ func TestAgentHostTelemetryUsesRegistrationCredential(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read Agent Host registry row: %v", err)
 	}
-	if host.Status != "online" || !strings.Contains(string(host.LastTelemetry), `"health":"ok"`) {
+	if host.Status != "online" || !strings.Contains(string(host.LastTelemetry), `"memoryBytes":4096`) {
 		t.Fatalf("unexpected Agent Host telemetry: %#v", host)
+	}
+	var rows int64
+	if err := database.Model(&storage.AgentHost{}).
+		Where("workspace_id = ?", "workspace-telemetry").Count(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	if rows != 1 {
+		t.Fatalf("Agent Host telemetry rows = %d, want 1", rows)
 	}
 }
 

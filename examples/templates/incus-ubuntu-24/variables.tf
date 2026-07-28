@@ -45,8 +45,8 @@ variable "zaw_agent_workspace_dir" {
 
 variable "zaw_install_command" {
   type        = string
-  description = "Optional cloud-init command that installs the zaw binary in the VM."
-  default     = ""
+  description = "Cloud-init command that installs the Agent Host and its runtime dependencies."
+  default     = "curl -fsSL https://gh.io/copilot-install | VERSION=v1.0.75 PREFIX=/usr/local bash"
 }
 
 variable "zaw_agent_host_command" {

@@ -61,6 +61,7 @@ func TestServerModelAPIKeepsKeySecretAndStreamsNeutralEvents(t *testing.T) {
 		http.MethodPost,
 		"/api/v1/model-providers",
 		map[string]any{
+			"id":   "deepseek",
 			"name": "User DeepSeek", "kind": "deepseek",
 			"apiBase": upstream.URL, "apiKey": "deepseek-secret",
 		},
@@ -88,7 +89,8 @@ func TestServerModelAPIKeepsKeySecretAndStreamsNeutralEvents(t *testing.T) {
 			"providerId": provider.ID, "name": "zaw-default",
 			"upstreamModel": "deepseek-v4-pro", "isDefault": true,
 			"capabilities": map[string]any{
-				"textInput": true, "reasoning": true, "tools": true,
+				"textInput": true, "contextWindow": 128000,
+				"reasoning": true, "tools": true,
 				"structuredOutput": true, "streaming": true,
 				"reasoningEfforts": []string{"high", "max"},
 			},
@@ -125,7 +127,7 @@ func TestServerModelAPIKeepsKeySecretAndStreamsNeutralEvents(t *testing.T) {
 		nil,
 	)
 	if modelProfile.Code != http.StatusOK ||
-		!strings.Contains(modelProfile.Body.String(), `"model":"zaw-default"`) {
+		!strings.Contains(modelProfile.Body.String(), `"model":"deepseek/deepseek-v4-pro"`) {
 		t.Fatalf("model profile: %d %s", modelProfile.Code, modelProfile.Body.String())
 	}
 
@@ -170,7 +172,8 @@ func TestServerModelAPIKeepsKeySecretAndStreamsNeutralEvents(t *testing.T) {
 		"/api/v1/llm/openai/v1/responses",
 		token,
 		map[string]any{
-			"model": "zaw-default", "input": "question", "stream": true,
+			"model": "deepseek/deepseek-v4-pro", "input": "question", "stream": true,
+			"metadata":  map[string]string{"client": "copilot"},
 			"reasoning": map[string]string{"effort": "high", "summary": "auto"},
 		},
 	)

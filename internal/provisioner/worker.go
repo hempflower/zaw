@@ -19,17 +19,13 @@ import (
 
 type Config struct {
 	ServerURL                   string
+	Key                         string
 	Name                        string
 	WorkRoot                    string
 	TerraformBinary             string
 	DockerHost                  string
 	IncusBinary                 string
-	AgentHostBinary             string
-	SecretManagerURL            string
-	StateEndpoint               string
-	StateBucket                 string
-	StateAccessKey              string
-	StateSecretKey              string
+	StateDirectory              string
 	TerraformTimeout            time.Duration
 	PluginCacheDir              string
 	RetainFailedWorkDirectories bool
@@ -79,6 +75,9 @@ func New(config Config) (*Worker, error) {
 	if config.ServerURL == "" {
 		config.ServerURL = "http://127.0.0.1:8080"
 	}
+	if config.Key == "" {
+		config.Key = os.Getenv("ZAW_PROVISIONER_KEY")
+	}
 	if config.Name == "" {
 		config.Name = os.Getenv("ZAW_PROVISIONER_NAME")
 	}
@@ -87,12 +86,6 @@ func New(config Config) (*Worker, error) {
 	}
 	if config.WorkRoot == "" {
 		config.WorkRoot = os.Getenv("ZAW_PROVISIONER_WORK_ROOT")
-	}
-	if config.SecretManagerURL == "" {
-		config.SecretManagerURL = os.Getenv("ZAW_SECRET_MANAGER_ADDR")
-	}
-	if config.SecretManagerURL == "" {
-		config.SecretManagerURL = "http://127.0.0.1:8200"
 	}
 	if config.WorkRoot == "" {
 		config.WorkRoot = os.TempDir()
@@ -118,17 +111,11 @@ func New(config Config) (*Worker, error) {
 	if os.Getenv("ZAW_PROVISIONER_RETAIN_FAILED_WORKDIR") == "true" {
 		config.RetainFailedWorkDirectories = true
 	}
-	if config.StateEndpoint == "" {
-		config.StateEndpoint = os.Getenv("ZAW_STATE_S3_ENDPOINT")
+	if config.StateDirectory == "" {
+		config.StateDirectory = os.Getenv("ZAW_TERRAFORM_STATE_DIR")
 	}
-	if config.StateBucket == "" {
-		config.StateBucket = os.Getenv("ZAW_STATE_S3_BUCKET")
-	}
-	if config.StateAccessKey == "" {
-		config.StateAccessKey = os.Getenv("ZAW_STATE_S3_ACCESS_KEY")
-	}
-	if config.StateSecretKey == "" {
-		config.StateSecretKey = os.Getenv("ZAW_STATE_S3_SECRET_KEY")
+	if config.StateDirectory == "" {
+		config.StateDirectory = filepath.Join(config.WorkRoot, "terraform-state")
 	}
 	if config.DockerHost == "" {
 		config.DockerHost = os.Getenv("ZAW_DOCKER_HOST")
@@ -138,9 +125,6 @@ func New(config Config) (*Worker, error) {
 	}
 	if config.IncusBinary == "" {
 		config.IncusBinary = "incus"
-	}
-	if config.AgentHostBinary == "" {
-		config.AgentHostBinary = os.Getenv("ZAW_AGENT_HOST_BINARY")
 	}
 	if config.DockerHost == "" {
 		config.DockerHost = os.Getenv("DOCKER_HOST")
@@ -161,16 +145,16 @@ func New(config Config) (*Worker, error) {
 			Timeout:        config.TerraformTimeout,
 			PluginCacheDir: config.PluginCacheDir,
 			State: terraformrunner.StateConfig{
-				Endpoint:  config.StateEndpoint,
-				Bucket:    config.StateBucket,
-				AccessKey: config.StateAccessKey,
-				SecretKey: config.StateSecretKey,
+				Directory: config.StateDirectory,
 			},
 		},
 	}, nil
 }
 
 func (w *Worker) Run(ctx context.Context) error {
+	if w.config.Key == "" {
+		return fmt.Errorf("provisioner key is required")
+	}
 	provisionerID, err := w.register(ctx)
 	if err != nil {
 		return err
@@ -231,6 +215,7 @@ func (w *Worker) claim(ctx context.Context, provisionerID string) (*claimedJob, 
 	if err != nil {
 		return nil, err
 	}
+	request.Header.Set("Authorization", "Bearer "+w.config.Key)
 	response, err := w.client.Do(request)
 	if err != nil {
 		return nil, err
@@ -359,32 +344,6 @@ func (w *Worker) injectIncusAgentCredential(
 	instanceName, ok := resources["instance_name"].(string)
 	if !ok || instanceName == "" {
 		return nil
-	}
-	if w.config.AgentHostBinary != "" {
-		binaryPath, err := filepath.Abs(w.config.AgentHostBinary)
-		if err != nil {
-			return fmt.Errorf("resolve Agent Host binary: %w", err)
-		}
-		info, err := os.Stat(binaryPath)
-		if err != nil || !info.Mode().IsRegular() {
-			return fmt.Errorf("Agent Host binary is unavailable: %s", binaryPath)
-		}
-		if err := runRedactedCommand(
-			ctx,
-			logs,
-			w.config.IncusBinary,
-			[]string{
-				"file",
-				"push",
-				"--mode=0755",
-				binaryPath,
-				instanceName + "/usr/local/bin/zaw",
-			},
-			w.config.IncusBinary+" file push [zaw binary] "+
-				instanceName+"/usr/local/bin/zaw",
-		); err != nil {
-			return fmt.Errorf("install Agent Host binary in Incus VM: %w", err)
-		}
 	}
 	var response struct {
 		Token string `json:"token"`
@@ -574,69 +533,44 @@ func (w *Worker) credentialForBuild(
 	if snapshot.CredentialID == "" {
 		return nil, nil
 	}
-	var lease struct {
-		LeaseToken string            `json:"leaseToken"`
-		Kind       string            `json:"kind"`
-		Metadata   map[string]string `json:"metadata"`
+	var credential struct {
+		Secret   map[string]string `json:"secret"`
+		Kind     string            `json:"kind"`
+		Metadata map[string]string `json:"metadata"`
 	}
 	path := "/api/v1/provisioners/" + provisionerID + "/jobs/" + job.ID
-	path += "/credentials/" + snapshot.CredentialID + "/lease"
-	if err := w.request(ctx, http.MethodPost, path, nil, &lease); err != nil {
+	path += "/credentials/" + snapshot.CredentialID + "/secret"
+	if err := w.request(ctx, http.MethodPost, path, nil, &credential); err != nil {
 		return nil, err
 	}
-	secret, err := w.unwrapLease(ctx, lease.LeaseToken)
-	if err != nil {
-		return nil, err
-	}
-	return &gitCredential{Kind: lease.Kind, Metadata: lease.Metadata, Secret: secret}, nil
-}
-
-func (w *Worker) unwrapLease(ctx context.Context, token string) (map[string]string, error) {
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		strings.TrimRight(w.config.SecretManagerURL, "/")+"/v1/sys/wrapping/unwrap",
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("X-Vault-Token", token)
-	response, err := w.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("credential lease unwrap failed")
-	}
-	var payload struct {
-		Data struct {
-			Data map[string]string `json:"data"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-		return nil, err
-	}
-	return payload.Data.Data, nil
+	return &gitCredential{
+		Kind: credential.Kind, Metadata: credential.Metadata, Secret: credential.Secret,
+	}, nil
 }
 
 func gitCredentialEnvironment(
-	workDirectory string,
 	credential *gitCredential,
 ) ([]string, func(), error) {
 	if credential == nil {
 		return []string{"GIT_TERMINAL_PROMPT=0"}, func() {}, nil
 	}
+	credentialDirectory, err := os.MkdirTemp("", "zaw-git-credential-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(credentialDirectory) }
 	if credential.Kind == "ssh_key" {
-		keyPath := filepath.Join(workDirectory, ".zaw-git-key")
+		keyPath := filepath.Join(credentialDirectory, "key")
 		if err := os.WriteFile(keyPath, []byte(credential.Secret["privateKey"]), 0o600); err != nil {
+			cleanup()
 			return nil, nil, err
 		}
 		return []string{
 			"GIT_TERMINAL_PROMPT=0",
-			"GIT_SSH_COMMAND=ssh -i " + keyPath + " -o IdentitiesOnly=yes",
-		}, func() { _ = os.Remove(keyPath) }, nil
+			"GIT_SSH_COMMAND=ssh -i " + keyPath +
+				" -o IdentitiesOnly=yes -o BatchMode=yes" +
+				" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15",
+		}, cleanup, nil
 	}
 	username := credential.Metadata["username"]
 	password := credential.Secret["password"]
@@ -644,13 +578,14 @@ func gitCredentialEnvironment(
 		username = "x-access-token"
 		password = credential.Secret["token"]
 	}
-	askPassPath := filepath.Join(workDirectory, ".zaw-git-askpass")
+	askPassPath := filepath.Join(credentialDirectory, "askpass")
 	script := "#!/bin/sh\n"
 	script += "case \"$1\" in\n"
 	script += "  *Username*) printf '%s' \"$ZAW_GIT_USERNAME\" ;;\n"
 	script += "  *) printf '%s' \"$ZAW_GIT_PASSWORD\" ;;\n"
 	script += "esac\n"
 	if err := os.WriteFile(askPassPath, []byte(script), 0o700); err != nil {
+		cleanup()
 		return nil, nil, err
 	}
 	return []string{
@@ -658,7 +593,7 @@ func gitCredentialEnvironment(
 		"GIT_ASKPASS=" + askPassPath,
 		"ZAW_GIT_USERNAME=" + username,
 		"ZAW_GIT_PASSWORD=" + password,
-	}, func() { _ = os.Remove(askPassPath) }, nil
+	}, cleanup, nil
 }
 
 func checkoutGit(
@@ -671,7 +606,7 @@ func checkoutGit(
 	if snapshot.Commit == "" {
 		return "", fmt.Errorf("git snapshot has no fixed commit")
 	}
-	environment, cleanup, err := gitCredentialEnvironment(workDirectory, credential)
+	environment, cleanup, err := gitCredentialEnvironment(credential)
 	if err != nil {
 		return "", err
 	}
@@ -751,6 +686,7 @@ func (w *Worker) request(
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+w.config.Key)
 	response, err := w.client.Do(request)
 	if err != nil {
 		return err

@@ -27,7 +27,7 @@
 - Server 保存 SessionSummary 查询投影，但不保存完整 Chat、Terminal、
   Changeset、AHP snapshot 或 action history。
 - Provisioner 主动连接 Server，并执行 Terraform。
-- Gorm 支持 SQLite 和 MySQL；Terraform State、Secret、模板源码使用专门存储。
+- Gorm 支持 SQLite 和 MySQL；Terraform State 使用 Provisioner 本机持久目录。
 - Server 统一提供 OpenAI、Anthropic 与 DeepSeek 模型；公开 LLM API 中立且不透传。
 - Template 不提供显式版本化；Workspace 固定创建时的源码快照。
 - Template 源码支持 Git 与 Tar URL。

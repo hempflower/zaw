@@ -118,6 +118,7 @@ func createCopilotTestProvider(
 		http.MethodPost,
 		"/api/v1/model-providers",
 		map[string]any{
+			"id":   "copilot-integration",
 			"name": "Copilot Integration", "kind": "openai",
 			"apiBase": upstreamURL, "apiKey": "upstream-secret",
 		},
@@ -138,7 +139,8 @@ func createCopilotTestModel(t *testing.T, server *Server, providerID string) mod
 		"providerId": providerID, "name": "copilot-test-model",
 		"upstreamModel": "upstream-test-model", "isDefault": true,
 		"capabilities": map[string]any{
-			"textInput": true, "reasoning": true, "tools": true,
+			"textInput": true, "contextWindow": 128000,
+			"reasoning": true, "tools": true,
 			"structuredOutput": true, "streaming": true,
 			"reasoningEfforts": []string{"high"},
 		},

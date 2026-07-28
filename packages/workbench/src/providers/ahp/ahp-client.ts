@@ -7,6 +7,7 @@ import type {
 } from "@zaw/protocol";
 import type { AgentMessage } from "../../services/agent-host";
 import type { AgentTerminal } from "../../services/agent-host";
+import type { AgentHostAgent } from "../../services/agent-host";
 import type {
   AgentChangeset,
   AgentChangesetFile,
@@ -34,6 +35,7 @@ export class AHPClient {
   private sessionChats = new Map<string, string>();
   private sessionChangesets = new Map<string, string>();
   private terminals = new Map<string, AgentTerminal>();
+  private agents: AgentHostAgent[] = [];
 
   private constructor(socket: WebSocket, clientID: string) {
     this.socket = socket;
@@ -75,14 +77,18 @@ export class AHPClient {
       initializeParams,
     )) as AHPInitializeResult;
     client.defaultDirectory = initialized.defaultDirectory ?? "";
-    client.readRootTerminals(initialized.snapshots ?? []);
+    client.readRootState(initialized.snapshots ?? []);
     return client;
   }
 
-  async createSession(title: string): Promise<{ resource: string }> {
+  async createSession(
+    title: string,
+    provider?: string,
+  ): Promise<{ resource: string }> {
     const resource = `ahp-session:/${crypto.randomUUID()}`;
     await this.request("createSession", {
       channel: resource,
+      ...(provider ? { provider } : {}),
     });
     const chat = await this.subscribeSession(resource);
     if (title) this.dispatch(resource, { type: "session/titleChanged", title });
@@ -90,11 +96,19 @@ export class AHPClient {
     return { resource };
   }
 
+  listAgents(): readonly AgentHostAgent[] {
+    return this.agents;
+  }
+
   async listSessions(): Promise<Array<{ resource: string; title: string }>> {
     const result = (await this.request("listSessions", {
       channel: "ahp-root://",
     })) as { items: Array<{ resource: string; title: string }> };
     return result.items;
+  }
+
+  async attachSession(resource: string): Promise<void> {
+    if (!this.sessionChats.has(resource)) await this.subscribeSession(resource);
   }
 
   close() {
@@ -115,20 +129,31 @@ export class AHPClient {
     return () => this.closeListeners.delete(listener);
   }
 
-  async createTerminal(
-    resource: string,
-    name: string,
-  ): Promise<{ resource: string }> {
+  async createTerminal(resource: string, name: string): Promise<AgentTerminal> {
     const result = (await this.request("createTerminal", {
       channel: resource,
       claim: { kind: "client", clientId: this.clientID },
       name,
       cols: 100,
       rows: 24,
-    })) as { snapshot: { resource: string } };
-    await this.request("subscribe", { channel: resource });
-    this.terminals.set(resource, { resource, title: name, output: "" });
-    return { resource: result.snapshot.resource };
+    })) as {
+      snapshot?: { resource?: string; state?: Record<string, unknown> };
+    };
+    const created = terminalFromSnapshot(result.snapshot, resource, name);
+    this.terminals.set(resource, created);
+    const subscribed = (await this.request("subscribe", {
+      channel: resource,
+    })) as {
+      snapshot?: { resource?: string; state?: Record<string, unknown> };
+    };
+    const terminal = terminalFromSnapshot(
+      subscribed.snapshot,
+      resource,
+      created.title,
+    );
+    if (!terminal.output) terminal.output = created.output;
+    this.terminals.set(resource, terminal);
+    return terminal;
   }
 
   listTerminals(): AgentTerminal[] {
@@ -173,12 +198,14 @@ export class AHPClient {
       this.sessionChats.get(resource) ??
       (await this.subscribeSession(resource));
     this.sessionChats.set(resource, chat);
-    this.dispatch(chat, {
+    const action = {
       type: "chat/turnStarted",
       turnId: crypto.randomUUID(),
       startedAt: new Date().toISOString(),
       message: this.toAHPMessage(message),
-    });
+    };
+    this.dispatch(chat, action);
+    this.emitAction({ channel: chat, action, serverSeq: 0 });
   }
 
   async updateDraft(resource: string, message?: AgentMessage): Promise<void> {
@@ -303,6 +330,15 @@ export class AHPClient {
   }
 
   private toAHPMessage(message: AgentMessage) {
+    const meta = {
+      ...(message.reasoningEffort
+        ? { "zaw/reasoningEffort": message.reasoningEffort }
+        : {}),
+      ...(message.approvalMode
+        ? { "zaw/approvalMode": message.approvalMode }
+        : {}),
+      ...(message.mode ? { "zaw/agentMode": message.mode } : {}),
+    };
     return {
       text: message.text,
       origin: { kind: "user" },
@@ -310,7 +346,8 @@ export class AHPClient {
         ? { attachments: message.attachments }
         : {}),
       ...(message.model ? { model: { id: message.model } } : {}),
-      ...(message.agent && message.agent !== "copilot"
+      ...(Object.keys(meta).length ? { _meta: meta } : {}),
+      ...(message.agent?.startsWith("agent:")
         ? { agent: { uri: message.agent } }
         : {}),
     };
@@ -409,16 +446,21 @@ export class AHPClient {
     request.resolve(payload.result);
   }
 
-  private readRootTerminals(snapshots: unknown[]) {
+  private readRootState(snapshots: unknown[]) {
     for (const snapshotValue of snapshots) {
       const snapshot = objectValue(snapshotValue);
       if (snapshot.resource !== "ahp-root://") continue;
       const state = objectValue(snapshot.state);
+      this.replaceAgents(state.agents);
       this.replaceTerminals(state.terminals);
     }
   }
 
   private applyTerminalAction(envelope: AHPAction) {
+    if (envelope.action.type === "root/agentsChanged") {
+      this.replaceAgents(envelope.action.agents);
+      return;
+    }
     if (envelope.action.type === "root/terminalsChanged") {
       this.replaceTerminals(envelope.action.terminals);
       return;
@@ -437,6 +479,28 @@ export class AHPClient {
     ) {
       terminal.title = envelope.action.title;
     }
+  }
+
+  private replaceAgents(value: unknown) {
+    if (!Array.isArray(value)) {
+      this.agents = [];
+      return;
+    }
+    this.agents = value.flatMap((entry) => {
+      const agent = objectValue(entry);
+      if (typeof agent.provider !== "string") return [];
+      return [
+        {
+          description:
+            typeof agent.description === "string" ? agent.description : "",
+          id: agent.provider,
+          name:
+            typeof agent.displayName === "string"
+              ? agent.displayName
+              : agent.provider,
+        },
+      ];
+    });
   }
 
   private replaceTerminals(value: unknown) {
@@ -474,6 +538,19 @@ function terminalOutput(value: unknown) {
           : "";
     })
     .join("");
+}
+
+function terminalFromSnapshot(
+  snapshot: { resource?: string; state?: Record<string, unknown> } | undefined,
+  resource: string,
+  fallbackTitle: string,
+): AgentTerminal {
+  const state = snapshot?.state ?? {};
+  return {
+    resource: snapshot?.resource ?? resource,
+    title: typeof state.title === "string" ? state.title : fallbackTitle,
+    output: terminalOutput(state.content),
+  };
 }
 
 function workbenchClientID(workspaceID: string) {

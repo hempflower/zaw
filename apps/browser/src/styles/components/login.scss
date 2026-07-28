@@ -1,0 +1,71 @@
+.zaw-login {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  width: 100vw;
+  min-width: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: auto;
+  padding: 24px;
+  place-items: center;
+  color: var(--zaw-foreground);
+  background: var(--zaw-editor-background);
+}
+
+.zaw-login-form {
+  display: flex;
+  width: min(320px, 100%);
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zaw-login-form h1,
+.zaw-login-form p {
+  margin: 0;
+}
+
+.zaw-login-form h1 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.zaw-login-form p {
+  margin-bottom: 16px;
+  color: var(--zaw-foreground-muted);
+}
+
+.zaw-login-form label {
+  font-size: 12px;
+}
+
+.zaw-login-form input {
+  height: 26px;
+  padding: 0 7px;
+  color: var(--zaw-foreground);
+  border: 1px solid var(--zaw-input-border-hover);
+  outline: none;
+  background: var(--zaw-input-background);
+}
+
+.zaw-login-form input:focus {
+  border-color: var(--zaw-accent);
+}
+
+.zaw-login-form button {
+  height: 28px;
+  margin-top: 4px;
+  color: var(--zaw-button-foreground);
+  border: 0;
+  background: var(--zaw-button-background);
+}
+
+.zaw-login-form button:hover {
+  background: var(--zaw-button-hover);
+}
+
+.zaw-login-error {
+  min-height: 17px;
+  color: var(--zaw-error);
+  font-size: 12px;
+}

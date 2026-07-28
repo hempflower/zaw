@@ -20,9 +20,12 @@ type Session interface {
 }
 
 type PromptRequest struct {
-	Text        string
-	Model       string
-	Attachments []Attachment
+	Text            string
+	Model           string
+	ReasoningEffort string
+	ApprovalMode    string
+	AgentMode       string
+	Attachments     []Attachment
 }
 
 type Attachment struct {

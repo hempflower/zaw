@@ -8,7 +8,7 @@ terraform {
     }
   }
 
-  backend "s3" {}
+  backend "local" {}
 }
 
 provider "docker" {}
@@ -20,6 +20,7 @@ locals {
       "ZAW_WORKSPACE_ID=${var.zaw_workspace_id}",
       "ZAW_WORKSPACE_DIR=${var.zaw_agent_workspace_dir}",
       "ZAW_AGENT_PROVIDER=${var.zaw_agent_provider}",
+      "ZAW_AGENT_AUTO_UPDATE=true",
       "ZAW_COPILOT_CLI_PATH=${var.zaw_copilot_cli_path}",
       "ZAW_WORKSPACE_TRANSITION=${var.zaw_workspace_transition}",
     ],
@@ -56,7 +57,12 @@ resource "docker_container" "workspace" {
     "-ec",
     <<-SCRIPT
       if [ -n "$${ZAW_AGENT_COMMAND:-}" ]; then
-        sh -c "$${ZAW_AGENT_COMMAND}" &
+        (
+          while true; do
+            sh -c "$${ZAW_AGENT_COMMAND}" || true
+            sleep 5
+          done
+        ) &
       fi
       exec sleep infinity
     SCRIPT

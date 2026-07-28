@@ -211,6 +211,7 @@ func setAgentOutputs(data *schema.ResourceData, config configuration) diag.Diagn
 	}
 	environment := map[string]string{
 		"ZAW_AGENT_PROVIDER":                data.Get("agent_provider").(string),
+		"ZAW_AGENT_AUTO_UPDATE":             "true",
 		"ZAW_AGENT_HOST_URL":                config.agentHostURL(workspaceID),
 		"ZAW_AGENT_REGISTRATION_TOKEN_FILE": data.Get("registration_token_file").(string),
 		"ZAW_COPILOT_CLI_PATH":              data.Get("copilot_cli_path").(string),

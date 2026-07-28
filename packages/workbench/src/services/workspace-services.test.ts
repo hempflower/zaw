@@ -103,6 +103,18 @@ describe("multi-workspace services", () => {
     expect(received).toEqual(["second"]);
   });
 
+  it("reuses an attachment for repeated selection of the same workspace", async () => {
+    const provider = new DeferredProvider();
+    const service = new WorkspaceAttachmentService(provider);
+    const first = service.attach("same");
+    const host = new FakeHost();
+    provider.pending.get("same")!.resolve(host as unknown as IAgentHost);
+    await expect(first).resolves.toBe(host);
+    await expect(service.attach("same")).resolves.toBe(host);
+    expect(provider.pending.size).toBe(1);
+    expect(host.closed).toBe(false);
+  });
+
   it("restores UI state independently per Workspace", () => {
     const state = new WorkspaceUIStateService();
     state.save("first", {
@@ -113,6 +125,35 @@ describe("multi-workspace services", () => {
     expect(state.load("first").sessionResource).toBe("ahp-session:/one");
     expect(state.load("first").terminalPanelHeight).toBe(360);
     expect(state.load("second").sessionResource).toBe("ahp-session:/two");
+  });
+
+  it("restores detail UI state independently per Session", () => {
+    const state = new WorkspaceUIStateService();
+    state.saveSessionDetails("workspace", "ahp-session:/one", {
+      activeView: {
+        id: "file:README.md",
+        kind: "preview",
+        title: "README.md",
+      },
+      auxiliaryVisible: true,
+    });
+    state.saveSessionDetails("workspace", "ahp-session:/two", {
+      activeView: { id: "changes", kind: "changes", title: "Changes" },
+      auxiliaryVisible: false,
+    });
+
+    expect(
+      state.loadSessionDetails("workspace", "ahp-session:/one"),
+    ).toMatchObject({
+      activeView: { id: "file:README.md" },
+      auxiliaryVisible: true,
+    });
+    expect(
+      state.loadSessionDetails("workspace", "ahp-session:/two"),
+    ).toMatchObject({
+      activeView: { id: "changes" },
+      auxiliaryVisible: false,
+    });
   });
 });
 

@@ -10,12 +10,13 @@ import { HTTPClient } from "./http-client";
 export class HTTPSessionCatalogProvider implements ISessionCatalogProvider {
   constructor(@inject(HTTPClient) private readonly client: HTTPClient) {}
 
-  async list() {
+  async list(provider?: string) {
     const items: SessionCatalogItem[] = [];
     let cursor = "";
     do {
       const query = new URLSearchParams({ limit: "200" });
       if (cursor) query.set("cursor", cursor);
+      if (provider) query.set("provider", provider);
       const page = await this.client.request<SessionCatalogPage>(
         `/sessions?${query.toString()}`,
       );

@@ -16,6 +16,7 @@ export type CreateWorkspaceInput = {
 export interface IWorkspaceProvider {
   create(input: CreateWorkspaceInput): Promise<{ buildId: string; id: string }>;
   list(): Promise<Workspace[]>;
+  buildLogs(buildID: string): Promise<{ logs: string }>;
   requestBuild(
     workspaceID: string,
     operation: WorkspaceBuildOperation,

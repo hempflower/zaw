@@ -6,7 +6,7 @@ tasks:
     cmds:
       - pnpm install {{.CLI_ARGS | default "--frozen-lockfile=false"}}
   up:
-    desc: Start local MySQL, MinIO, and OpenBao
+    desc: Start optional local MySQL
     cmds:
       - docker compose up -d
   down:
@@ -25,6 +25,13 @@ tasks:
     desc: Run a local Provisioner
     cmds:
       - go run ./cmd/zaw provisioner
+  install-meta-routing:
+    desc: Route Incus workspace traffic through the local Clash Meta TUN
+    cmds:
+      - sudo install -m 0755 scripts/configure-incus-meta-routing.sh /usr/local/sbin/zaw-incus-meta-routing
+      - sudo install -m 0644 deploy/systemd/zaw-incus-meta-routing.service /etc/systemd/system/zaw-incus-meta-routing.service
+      - sudo systemctl daemon-reload
+      - sudo systemctl enable --now zaw-incus-meta-routing.service
   agent-host:
     desc: Run an Agent Host
     cmds:

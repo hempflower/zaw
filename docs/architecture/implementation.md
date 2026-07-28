@@ -49,24 +49,42 @@ zaw/
 Workbench 内部架构的最终改造步骤、删除清单和验收门禁见
 [Workbench 架构改造路线图](workbench-refactoring-roadmap.md)。
 
+### 当前目录（R20）
+
 ```text
 packages/workbench/src/
-├─ bootstrap/
-├─ services/
-├─ providers/
-├─ parts/
-├─ views/
-├─ widgets/
-└─ styles/
+├─ bootstrap/          # DI 容器、framework-only Workbench 入口、架构守卫
+├─ platform/           # Command、Action、Context Key、Lifecycle、Overlay、Theme
+├─ workbench/          # Contribution lifecycle 与稳定 Layout/Part 框架
+├─ contrib/            # Sessions、Workspace、Terminal、Management 功能贡献
+├─ services/           # 跨功能 typed port、View registry、可扩展 provider/status registry
+├─ providers/          # HTTP/AHP transport adapter
+├─ views/workbench/    # Titlebar framework View
+└─ styles/             # shell、views、widgets 分所有权 SCSS
 ```
+
+目录表达所有权，不强制一次性搬动全部文件。文件移动必须伴随依赖方向检查。
+
+### 生产 Import 规则
+
+| 源目录 | 可依赖 | 禁止依赖 |
+| ------ | ------ | -------- |
+| `bootstrap/` | platform、workbench 注册与布局接口 | contrib/\*\* 具体功能实现 |
+| `contrib/<feature>/` | platform、workbench framework、provider port | 其他 contrib 的具体 Service |
+| `services/` | provider port（只 import interface） | View、Widget、Part、具体 DOM 类型 |
+| `providers/` | 无（只实现 typed port） | View、Part、Workbench、bootstrap |
+| `views/` | services（只 import interface） | HTTP/WebSocket/AHP provider |
+| `platform/` | @zaw/ui 基础类型 | contrib/\*\*、具体 Service、View |
 
 - Workbench 不使用 React。
 - InversifyJS 负责接口和实现装配。
 - View 只消费 Service，不直接访问 HTTP、WebSocket 或 AHP。
 - 所有 UI 元素是 class Widget；可复用组件也属于 widgets。
-- 固定 Part 使用位置/用途命名：Titlebar、LeftSidebar、PrimaryArea、
-  BottomPanel、SecondarySidebar。
+- 固定 Part ID 为 Titlebar、Sidebar、Primary、AuxiliaryBar、Panel、Overlay；DOM 在启动时
+  创建一次，隐藏只改变 Layout 状态。
 - Terminal、Changes 和 Files 是注册到 Part 的 View，不是 Part。
+- `IAgentHostProviderRegistry`、`ISessionStatusRegistry` 和 `IActionRegistry` 是公开扩展点；
+  新 provider/status/action 不修改 Workbench 或通用 renderer。
 - 设置和管理功能使用 OverlayLayer 中的 FloatingWindowWidget。
 
 ## 最终集成范围
@@ -88,7 +106,7 @@ packages/workbench/src/
 ## 尚待后续里程碑确定的事项
 
 - 正式身份认证、组织权限与 Workspace 共享模型。
-- Terraform State Backend 的生产高可用和加密策略。
-- Secret Manager 的生产部署与轮换策略。
+- Terraform State 本机目录的备份、权限和磁盘可靠性策略。
+- Local Secret Store 的备份与文件权限检查策略。
 - Server 横向扩展时 Agent Host physical connection 的归属和迁移策略。
 - Electron 原生增强和内置浏览器的最终安全边界。

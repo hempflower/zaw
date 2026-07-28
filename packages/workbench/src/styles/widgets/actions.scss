@@ -1,0 +1,231 @@
+.zaw-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 var(--zaw-spacing-60);
+  color: var(--zaw-icon);
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: var(--zaw-corner-radius-small);
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    color: var(--zaw-foreground);
+    background: var(--zaw-toolbar-hover-background);
+  }
+
+  &:active:not(:disabled) {
+    color: var(--zaw-foreground);
+    background: var(--zaw-toolbar-active-background);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--zaw-focus-border);
+    outline-offset: 1px;
+  }
+
+  &.checked {
+    color: var(--zaw-foreground);
+    background: var(--zaw-toolbar-active-background);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.zaw-action-icon {
+  width: 22px;
+  min-width: 22px;
+  padding: 0;
+}
+
+.zaw-action-primary:not(:disabled) {
+  color: var(--zaw-button-foreground);
+  background: var(--zaw-button-background);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--zaw-button-foreground);
+    background: var(--zaw-button-hover);
+  }
+}
+
+.zaw-action-glyph {
+  flex: 0 0 auto;
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.zaw-action-progress {
+  display: none;
+  flex: 0 0 auto;
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.zaw-action-progress[hidden] {
+  display: none !important;
+}
+
+.zaw-action.working {
+  .zaw-action-progress {
+    display: inline-block;
+    animation: zaw-action-spin 1.5s linear infinite;
+  }
+
+  .zaw-action-glyph {
+    display: none;
+  }
+}
+
+@keyframes zaw-action-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.zaw-action-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zaw-action-glyph + .zaw-action-label {
+  margin-left: var(--zaw-spacing-40);
+}
+
+.zaw-toolbar {
+  display: flex;
+  min-width: 0;
+  gap: var(--zaw-spacing-20);
+  align-items: center;
+  overflow: hidden;
+}
+
+.zaw-toolbar.vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.zaw-toolbar-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.zaw-badge {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--zaw-spacing-40);
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--zaw-agents-badge-foreground);
+  font-size: var(--zaw-agents-font-size-label2);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--zaw-agents-badge-background);
+  border-radius: var(--zaw-corner-radius-circle);
+}
+
+.zaw-badge-status {
+  max-width: 200px;
+}
+
+.zaw-picker-action {
+  max-width: 100%;
+  font-size: var(--zaw-agents-font-size-label2);
+
+  summary {
+    height: 22px;
+    min-height: 22px;
+    min-width: 30px;
+    max-width: 100%;
+    padding: 3px 7px;
+    overflow: hidden;
+    border-radius: var(--zaw-corner-radius-small);
+  }
+}
+
+.zaw-picker-action-trigger,
+.zaw-picker-action-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  overflow: hidden;
+}
+
+.zaw-picker-action-label {
+  margin-left: var(--zaw-spacing-40);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zaw-picker-action-trigger > .codicon {
+  flex-shrink: 0;
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.zaw-picker-action-menu {
+  width: max(180px, 100%);
+}
+
+.agent-workspace-picker .zaw-picker-action-menu {
+  width: max(220px, 100%);
+}
+
+.agent-workspace-picker .zaw-dropdown-item {
+  display: flex;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 var(--zaw-spacing-60);
+  font-size: var(--zaw-agents-font-size-label1);
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.agent-workspace-picker .zaw-dropdown-item-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+.agent-workspace-picker .zaw-dropdown-item-content > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-workspace-picker .zaw-dropdown-item:last-child {
+  margin-top: var(--zaw-spacing-40);
+  box-shadow: 0 calc(-1 * var(--zaw-spacing-20)) 0
+    var(--zaw-agents-panel-border);
+}
+
+@media (forced-colors: active) {
+  .zaw-action.checked,
+  .zaw-action:focus-visible {
+    outline: 1px solid CanvasText;
+  }
+
+  .zaw-badge {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zaw-action.working .zaw-action-progress {
+    animation: none;
+  }
+}

@@ -10,24 +10,27 @@ build. The template sets the Incus resource's `running` state to false, which
 stops the existing VM in place; a later start sets it back to true. Only
 `delete` invokes `terraform destroy`, which removes both VM and volume.
 
-## Agent injection
+## Agent bootstrap
 
-The Provisioner injects the immutable workspace ID and `running` lifecycle state. The
+The Provisioner supplies the immutable workspace ID and `running` lifecycle state. The
 template derives the Agent Host environment and init script from those inputs,
-writes them with cloud-init, and starts a systemd service after a `zaw` binary
-is available. Set these template parameters for a usable Agent Host:
+writes them with cloud-init, downloads the checksummed Agent Host directly from
+the Zaw control plane, installs the official GitHub Copilot CLI v1.0.75, and
+starts a systemd service. Relevant parameters:
 
 ```hcl
 zaw_server_url       = "ws://10.99.0.1:8080"
 zaw_agent_provider   = "copilot"
 zaw_copilot_cli_path = "/usr/local/bin/copilot"
-zaw_install_command  = "install -m 0755 /path/to/zaw /usr/local/bin/zaw"
+zaw_install_command  = "# optional Agent SDK dependency install command"
 ```
 
-`zaw_server_url` must be routable from the VM. The install command is
-deliberately explicit: Zaw has no public binary distribution configured by this
-repository, so the template does not invent an unsafe download location. The image
-must also contain the GitHub Copilot CLI required by its official Go SDK.
+`zaw_server_url` must be routable from the VM. Agent Host binaries are served by
+the control plane from the public, platform-scoped `/downloads/zaw/...` route;
+the bootstrap verifies its SHA-256 response header before installation. After
+bootstrap, the Agent Host checks that route every 15 minutes and atomically
+installs a changed runtime. The download contains no Workspace credential and
+does not require authentication.
 
 After `terraform apply`, the Provisioner requests a Workspace-scoped Agent Host
 registration credential for the claimed Build and writes it directly to
@@ -39,7 +42,7 @@ selects the local Incus CLI.
 
 ## Local lifecycle verification
 
-With Incus, Terraform, `jq`, MinIO, and Go installed on the host, run:
+With Incus, Terraform, `jq`, and Go installed on the host, run:
 
 ```sh
 task test-incus
@@ -47,9 +50,8 @@ task test-incus
 
 The check creates a uniquely named Ubuntu 24 VM, proves that stop is an
 in-place update with no delete action, restarts the same VM identity, verifies
-binary and protected credential injection, and finally destroys only its own
-isolated VM and volume. State is stored under a unique `verification/` key in
-the configured S3-compatible bucket.
+runtime installation and protected credential injection, and finally destroys only its own
+isolated VM and volume. State is stored in the verification working directory.
 
 ## Provider setup
 

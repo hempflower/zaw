@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"runtime/metrics"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,15 +35,19 @@ type Config struct {
 	RegistrationTokenFile string
 	AgentProvider         string
 	CopilotCLIPath        string
+	AutoUpdate            bool
+	UpdateInterval        time.Duration
 }
 
 type modelProfile struct {
-	Model        string `json:"model"`
+	Model        string                     `json:"model"`
+	Models       []copilotagent.ModelConfig `json:"models"`
 	Capabilities struct {
 		ImageInput             bool     `json:"imageInput"`
 		Reasoning              bool     `json:"reasoning"`
 		ReasoningEfforts       []string `json:"reasoningEfforts"`
 		DefaultReasoningEffort string   `json:"defaultReasoningEffort"`
+		ContextWindow          int      `json:"contextWindow"`
 	} `json:"capabilities"`
 }
 
@@ -73,6 +78,7 @@ type session struct {
 	State        ahptypes.SessionState
 	Chat         ahptypes.ChatState
 	AgentSession agentsdk.Session
+	ApprovalMode string
 }
 
 type terminal struct {
@@ -169,12 +175,14 @@ func Run(ctx context.Context, config Config) error {
 			CLIPath:          config.CopilotCLIPath,
 			WorkingDirectory: config.WorkspaceDir,
 			Model:            profile.Model,
+			Models:           profile.Models,
 			LLMBaseURL:       gatewayURL,
 			LLMToken:         token,
 			Vision:           profile.Capabilities.ImageInput,
 			Reasoning:        profile.Capabilities.Reasoning,
 			ReasoningEfforts: profile.Capabilities.ReasoningEfforts,
 			ReasoningEffort:  profile.Capabilities.DefaultReasoningEffort,
+			ContextWindow:    profile.Capabilities.ContextWindow,
 		})
 	default:
 		return fmt.Errorf("unsupported Agent SDK provider %q", config.AgentProvider)
@@ -213,6 +221,14 @@ func resolveConfig(config Config) (Config, error) {
 	}
 	if config.CopilotCLIPath == "" {
 		config.CopilotCLIPath = os.Getenv("ZAW_COPILOT_CLI_PATH")
+	}
+	if !config.AutoUpdate {
+		config.AutoUpdate, _ = strconv.ParseBool(os.Getenv("ZAW_AGENT_AUTO_UPDATE"))
+	}
+	if config.UpdateInterval <= 0 {
+		if value := os.Getenv("ZAW_AGENT_UPDATE_INTERVAL"); value != "" {
+			config.UpdateInterval, _ = time.ParseDuration(value)
+		}
 	}
 	if config.WorkspaceDir == "" {
 		config.WorkspaceDir, _ = os.Getwd()
@@ -265,11 +281,26 @@ func RunWithRuntime(ctx context.Context, config Config, runtime agentsdk.Runtime
 	}
 	host := NewWithAgent(runtime, config.WorkspaceDir)
 	defer host.Close()
-	go host.reportTelemetry(ctx, config)
+	runContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	updated := make(chan struct{})
+	if config.AutoUpdate {
+		go runAutoUpdater(runContext, config, func() {
+			close(updated)
+			cancel()
+		})
+	}
+	go host.reportTelemetry(runContext, config)
 	for {
-		if err := host.connectAndServe(ctx, config); err != nil && ctx.Err() == nil {
+		err := host.connectAndServe(runContext, config)
+		select {
+		case <-updated:
+			return nil
+		default:
+		}
+		if err != nil && runContext.Err() == nil {
 			select {
-			case <-ctx.Done():
+			case <-runContext.Done():
 				return nil
 			case <-time.After(time.Second):
 			}
@@ -865,6 +896,10 @@ func (h *Host) handleAgentPermission(
 	if !exists || entry.Chat.ActiveTurn == nil {
 		h.mu.Unlock()
 		return agentsdk.PermissionCancel
+	}
+	if entry.ApprovalMode == "allow" || entry.ApprovalMode == "autopilot" {
+		h.mu.Unlock()
+		return agentsdk.PermissionAllowOnce
 	}
 	h.sequence++
 	key := fmt.Sprintf("permission-%d", h.sequence)

@@ -20,11 +20,11 @@ const primary: WorkbenchViewContainer = {
   title: "Primary",
 };
 
-const view = (
-  id: string,
-  order?: number,
-): WorkbenchViewDescriptor<Record<string, never>> => ({
-  factory: vi.fn(),
+const view = (id: string, order?: number): WorkbenchViewDescriptor => ({
+  ctor: class {
+    readonly id = id;
+    dispose() {}
+  },
   id,
   name: id,
   order,
@@ -60,7 +60,7 @@ describe("WorkbenchViewContainersRegistry", () => {
 
 describe("WorkbenchViewsRegistry", () => {
   it("orders views and resolves their container", () => {
-    const registry = new WorkbenchViewsRegistry<Record<string, never>>();
+    const registry = new WorkbenchViewsRegistry();
     const later = view("later", 20);
     const earlier = view("earlier", 10);
     registry.registerViews([later, earlier], primary);
@@ -71,7 +71,7 @@ describe("WorkbenchViewsRegistry", () => {
   });
 
   it("enforces global view IDs and emits registration changes", () => {
-    const registry = new WorkbenchViewsRegistry<Record<string, never>>();
+    const registry = new WorkbenchViewsRegistry();
     const registered = vi.fn();
     const deregistered = vi.fn();
     const descriptor = view("sessions");

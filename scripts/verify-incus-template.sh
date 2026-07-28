@@ -7,11 +7,6 @@ template_directory="$repository_root/examples/templates/incus-ubuntu-24"
 workspace_id="m7-verify-$(date -u +%Y%m%d%H%M%S)-$$"
 instance_name="zaw-$workspace_id"
 volume_name="$instance_name-workspace"
-state_bucket="${ZAW_STATE_S3_BUCKET:-zaw-terraform-state}"
-state_endpoint="${ZAW_STATE_S3_ENDPOINT:-http://127.0.0.1:9000}"
-export AWS_ACCESS_KEY_ID="${ZAW_STATE_S3_ACCESS_KEY:-zawminio}"
-export AWS_SECRET_ACCESS_KEY="${ZAW_STATE_S3_SECRET_KEY:-zawminio-local-only}"
-export AWS_ENDPOINT_URL_S3="$state_endpoint"
 
 case "$workspace_id" in
   m7-verify-*) ;;
@@ -44,14 +39,7 @@ fi
 
 cp -a "$template_directory/." "$work_directory/"
 terraform -chdir="$work_directory" init -input=false \
-  -backend-config="bucket=$state_bucket" \
-  -backend-config="key=verification/$workspace_id.tfstate" \
-  -backend-config="region=us-east-1" \
-  -backend-config="skip_credentials_validation=true" \
-  -backend-config="skip_metadata_api_check=true" \
-  -backend-config="skip_requesting_account_id=true" \
-  -backend-config="use_path_style=true" \
-  -backend-config="use_lockfile=true"
+  -backend-config="path=$work_directory/terraform.tfstate"
 
 common_variables=(
   -var="workspace_id=$workspace_id"
@@ -88,9 +76,7 @@ terraform -chdir="$work_directory" apply -auto-approve \
 test "$(incus info "$instance_name" | awk '/^Status:/ {print tolower($2)}')" = "running"
 test "$(incus config get "$instance_name" volatile.uuid)" = "$original_uuid"
 
-(cd "$repository_root" && go build -o "$work_directory/zaw" ./cmd/zaw)
 printf '%s' 'm7-verification-token-not-a-real-credential' >"$work_directory/token"
-incus file push "$work_directory/zaw" "$instance_name/usr/local/bin/zaw" --mode=0755
 incus file push "$work_directory/token" \
   "$instance_name/etc/zaw/registration.token" --mode=0600
 test "$(incus exec "$instance_name" -- stat -c %a /usr/local/bin/zaw)" = "755"

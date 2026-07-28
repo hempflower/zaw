@@ -1,5 +1,6 @@
 import { Disposable, Emitter, type Event, type IDisposable } from "@zaw/ui";
 import { injectable } from "inversify";
+import type { ContextKeyExpression } from "../platform/context-key/context-key";
 
 export const IWorkbenchViewContainersRegistry = Symbol.for(
   "IWorkbenchViewContainersRegistry",
@@ -21,16 +22,30 @@ export type WorkbenchViewContainer = {
   title: string;
 };
 
-export type WorkbenchViewDescriptor<TContext = unknown> = {
-  factory: (
-    root: HTMLElement,
-    context: TContext,
-    descriptor: WorkbenchViewDescriptor<TContext>,
-  ) => IDisposable | void;
+/**
+ * Interface that DI-created Views must implement.
+ * Views receive their dependencies via @inject() and own their DOM.
+ */
+export interface IWorkbenchView extends IDisposable {
+  /** Unique view identifier matching the descriptor. */
+  readonly id: string;
+}
+
+export const ViewRoot = Symbol.for("WorkbenchViewRoot");
+/** Descriptor-provided immutable data for a single DI-created View instance. */
+export const ViewStaticArguments = Symbol.for("WorkbenchViewStaticArguments");
+
+export type WorkbenchViewDescriptor = {
+  /** A view is always created by a scoped DI container. */
+  ctor: new (...args: never[]) => IWorkbenchView;
   id: string;
   name: string;
   order?: number;
-  when?: (context: TContext) => boolean;
+  /** Keep the DI instance and DOM identity while its `when` clause is false. */
+  retainWhenHidden?: boolean;
+  staticArguments?: readonly unknown[];
+  /** Shared visibility expression for the view, commands and actions. */
+  when?: ContextKeyExpression;
 };
 
 export interface IWorkbenchViewContainersRegistry {
@@ -87,43 +102,38 @@ export class WorkbenchViewContainersRegistry
   }
 }
 
-export type WorkbenchViewsChange<TContext> = {
+export type WorkbenchViewsChange = {
   container: WorkbenchViewContainer;
-  views: WorkbenchViewDescriptor<TContext>[];
+  views: WorkbenchViewDescriptor[];
 };
 
-export interface IWorkbenchViewsRegistry<TContext = unknown> {
-  readonly onViewsDeregistered: Event<WorkbenchViewsChange<TContext>>;
-  readonly onViewsRegistered: Event<WorkbenchViewsChange<TContext>>;
-  getView(id: string): WorkbenchViewDescriptor<TContext> | undefined;
+export interface IWorkbenchViewsRegistry {
+  readonly onViewsDeregistered: Event<WorkbenchViewsChange>;
+  readonly onViewsRegistered: Event<WorkbenchViewsChange>;
+  getView(id: string): WorkbenchViewDescriptor | undefined;
   getViewContainer(viewID: string): WorkbenchViewContainer | undefined;
-  getViews(
-    container: WorkbenchViewContainer,
-  ): WorkbenchViewDescriptor<TContext>[];
+  getViews(container: WorkbenchViewContainer): WorkbenchViewDescriptor[];
   registerViews(
-    views: WorkbenchViewDescriptor<TContext>[],
+    views: WorkbenchViewDescriptor[],
     container: WorkbenchViewContainer,
   ): IDisposable;
 }
 
 @injectable()
-export class WorkbenchViewsRegistry<TContext = unknown>
+export class WorkbenchViewsRegistry
   extends Disposable
-  implements IWorkbenchViewsRegistry<TContext>
+  implements IWorkbenchViewsRegistry
 {
   private readonly containerByViewID = new Map<
     string,
     WorkbenchViewContainer
   >();
-  private readonly views = new Map<
-    string,
-    WorkbenchViewDescriptor<TContext>[]
-  >();
+  private readonly views = new Map<string, WorkbenchViewDescriptor[]>();
   private readonly _onViewsDeregistered = this._register(
-    new Emitter<WorkbenchViewsChange<TContext>>(),
+    new Emitter<WorkbenchViewsChange>(),
   );
   private readonly _onViewsRegistered = this._register(
-    new Emitter<WorkbenchViewsChange<TContext>>(),
+    new Emitter<WorkbenchViewsChange>(),
   );
   readonly onViewsDeregistered = this._onViewsDeregistered.event;
   readonly onViewsRegistered = this._onViewsRegistered.event;
@@ -144,7 +154,7 @@ export class WorkbenchViewsRegistry<TContext = unknown>
   }
 
   registerViews(
-    views: WorkbenchViewDescriptor<TContext>[],
+    views: WorkbenchViewDescriptor[],
     container: WorkbenchViewContainer,
   ): IDisposable {
     const duplicate = views.find((view) => this.containerByViewID.has(view.id));

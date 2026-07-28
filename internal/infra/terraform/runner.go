@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,10 +24,7 @@ type Runner struct {
 }
 
 type StateConfig struct {
-	Endpoint  string
-	Bucket    string
-	AccessKey string
-	SecretKey string
+	Directory string
 }
 
 func (r Runner) Execute(
@@ -48,10 +44,11 @@ func (r Runner) Execute(
 	if err != nil {
 		return nil, err
 	}
-	initArgs := append(
-		[]string{"init", "-input=false"},
-		r.State.initArguments(workspaceID)...,
-	)
+	stateArguments, err := r.State.initArguments(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	initArgs := append([]string{"init", "-input=false"}, stateArguments...)
 	if err := r.command(
 		executionContext,
 		workingDirectory,
@@ -113,7 +110,7 @@ func (r Runner) timeout() time.Duration {
 }
 
 func (r Runner) environment() ([]string, error) {
-	environment := append(r.State.environment(), r.Environment...)
+	environment := append([]string{}, r.Environment...)
 	if r.PluginCacheDir == "" {
 		return environment, nil
 	}
@@ -127,35 +124,20 @@ func destroysResources(operation string) bool {
 	return operation == "delete"
 }
 
-func (c StateConfig) environment() []string {
-	environment := make([]string, 0, 3)
-	if c.AccessKey != "" {
-		environment = append(environment, "AWS_ACCESS_KEY_ID="+c.AccessKey)
+func (c StateConfig) initArguments(workspaceID string) ([]string, error) {
+	if c.Directory == "" {
+		return nil, nil
 	}
-	if c.SecretKey != "" {
-		environment = append(environment, "AWS_SECRET_ACCESS_KEY="+c.SecretKey)
+	directory, err := filepath.Abs(c.Directory)
+	if err != nil {
+		return nil, fmt.Errorf("resolve Terraform state directory: %w", err)
 	}
-	if c.Endpoint != "" {
-		environment = append(environment, "AWS_ENDPOINT_URL_S3="+c.Endpoint)
+	workspaceDirectory := filepath.Join(directory, "workspaces", filepath.Base(workspaceID))
+	if err := os.MkdirAll(workspaceDirectory, 0o700); err != nil {
+		return nil, fmt.Errorf("create Terraform state directory: %w", err)
 	}
-	return environment
-}
-
-func (c StateConfig) initArguments(workspaceID string) []string {
-	if c.Bucket == "" {
-		return nil
-	}
-	arguments := []string{
-		"-backend-config=bucket=" + c.Bucket,
-		"-backend-config=key=" + path.Join("workspaces", workspaceID, "terraform.tfstate"),
-		"-backend-config=region=us-east-1",
-		"-backend-config=skip_credentials_validation=true",
-		"-backend-config=skip_metadata_api_check=true",
-		"-backend-config=skip_requesting_account_id=true",
-		"-backend-config=use_path_style=true",
-		"-backend-config=use_lockfile=true",
-	}
-	return arguments
+	statePath := filepath.Join(workspaceDirectory, "terraform.tfstate")
+	return []string{"-backend-config=path=" + statePath}, nil
 }
 
 func (r Runner) outputs(
@@ -220,7 +202,6 @@ func (r Runner) command(
 
 func (r Runner) redactions(environment []string) []string {
 	values := append([]string{}, r.SensitiveValues...)
-	values = append(values, r.State.AccessKey, r.State.SecretKey)
 	for _, variable := range environment {
 		name, value, found := strings.Cut(variable, "=")
 		if !found || value == "" {

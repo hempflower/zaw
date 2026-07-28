@@ -7,12 +7,21 @@ export type SessionCatalogItem = {
   title: string;
   status: number;
   activity?: string;
+  repository?: string;
   workingDirectory?: string;
   createdAt: string;
   modifiedAt: string;
   observedAt: string;
   agentHostOnline: boolean;
   stale: boolean;
+  approval?: {
+    label: string;
+  };
+  changes?: {
+    additions?: number;
+    deletions?: number;
+    files?: number;
+  };
 };
 
 export type SessionCatalogPage = {
@@ -21,5 +30,5 @@ export type SessionCatalogPage = {
 };
 
 export interface ISessionCatalogProvider {
-  list(): Promise<SessionCatalogItem[]>;
+  list(provider?: string): Promise<SessionCatalogItem[]>;
 }

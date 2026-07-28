@@ -96,8 +96,8 @@ AHP snapshot 或 action history。
 | 数据 | 存储位置 |
 | --- | --- |
 | 业务元数据、状态、审计、SessionSummary | SQLite / MySQL |
-| Terraform State | 独立远程 State Backend，例如 MinIO/S3 |
-| Secret | Secret Manager |
-| Model Provider API key | Secret Manager；Gorm 仅保存 Secret reference |
+| Terraform State | Provisioner 本机持久目录，按 Workspace 隔离 |
+| Secret | Local Secret Store |
+| Model Provider API key | Local Secret Store；Gorm 仅保存 Secret reference |
 | 模板文件 | Git 或 Tar URL |
 | 临时 Terraform 工作目录 | Provisioner 节点临时磁盘，完成后清理 |

@@ -7,8 +7,11 @@ export type AHPAction = AHPActionEnvelope;
 
 export type AgentMessage = {
   agent?: string;
+  mode?: "agent" | "ask" | "plan";
+  approvalMode?: "allow" | "ask" | "autopilot";
   attachments?: ChatAttachment[];
   model?: string;
+  reasoningEffort?: string;
   text: string;
 };
 
@@ -16,6 +19,12 @@ export type AgentTerminal = {
   output: string;
   resource: string;
   title: string;
+};
+
+export type AgentHostAgent = {
+  description: string;
+  id: string;
+  name: string;
 };
 
 export type AgentChangesetFile = {
@@ -39,8 +48,13 @@ export interface IAgentHost {
   isClosed(): boolean;
   onAction(listener: (action: AHPAction) => void): () => void;
   onClose(listener: () => void): () => void;
-  createSession(title: string): Promise<{ resource: string }>;
+  createSession(
+    title: string,
+    provider?: string,
+  ): Promise<{ resource: string }>;
+  listAgents(): readonly AgentHostAgent[];
   listSessions(): Promise<Array<{ resource: string; title: string }>>;
+  attachSession(resource: string): Promise<void>;
   promptSession(resource: string, message: AgentMessage): Promise<void>;
   updateDraft(resource: string, message?: AgentMessage): Promise<void>;
   cancelTurn(resource: string, turnID: string): Promise<void>;
@@ -50,7 +64,7 @@ export interface IAgentHost {
     toolCallID: string,
     approved: boolean,
   ): void;
-  createTerminal(resource: string, name: string): Promise<{ resource: string }>;
+  createTerminal(resource: string, name: string): Promise<AgentTerminal>;
   listTerminals(): AgentTerminal[];
   attachTerminal(resource: string): Promise<AgentTerminal>;
   disposeTerminal(resource: string): Promise<void>;

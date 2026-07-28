@@ -1,3 +1,185 @@
+.session-event.message > .markdown-body {
+  margin: 0;
+}
+
+.markdown-body {
+  min-width: 0;
+  line-height: 1.5;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  p,
+  ul,
+  ol,
+  blockquote,
+  pre,
+  table {
+    margin: 0 0 10px;
+  }
+
+  code {
+    padding: 1px 3px;
+    font-family: var(
+      --zaw-editor-font-family,
+      "SFMono-Regular",
+      Consolas,
+      monospace
+    );
+    font-size: 0.92em;
+    background: var(--zaw-text-code-block-background);
+    border-radius: 3px;
+  }
+
+  pre {
+    padding: 8px 10px;
+    overflow: auto;
+    background: var(--zaw-text-code-block-background);
+    border: 1px solid var(--zaw-agents-chat-request-border);
+    border-radius: var(--zaw-corner-radius-medium);
+
+    code {
+      padding: 0;
+      background: transparent;
+    }
+  }
+
+  blockquote {
+    padding-left: 10px;
+    color: var(--zaw-description);
+    border-left: 2px solid var(--zaw-agents-chat-request-border);
+  }
+
+  a {
+    color: var(--zaw-text-link-foreground);
+  }
+
+  table {
+    border-spacing: 0;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 4px 7px;
+    border: 1px solid var(--zaw-agents-chat-request-border);
+  }
+}
+
+.markdown-mermaid {
+  max-width: 100%;
+  margin: 8px 0;
+  overflow: auto;
+
+  svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.session-event.message.user {
+  width: fit-content;
+  max-width: min(85%, 720px);
+  margin-left: auto;
+  padding: 8px 12px;
+  background: var(--zaw-agents-chat-request-background);
+  border: 1px solid var(--zaw-agents-chat-request-border);
+  border-radius: var(--zaw-corner-radius-large);
+}
+
+.tool-event {
+  font-size: var(--zaw-agents-font-size-label1);
+}
+
+.tool-event-group {
+  font-size: var(--zaw-agents-font-size-label1);
+
+  > summary {
+    display: flex;
+    width: fit-content;
+    min-height: 22px;
+    gap: 4px;
+    align-items: center;
+    color: var(--zaw-description);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .tool-expando {
+    transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  &[open] > summary .tool-expando {
+    transform: rotate(90deg);
+  }
+}
+
+.tool-group-items {
+  display: grid;
+  gap: 0;
+  padding: 1px 0 1px 18px;
+}
+
+.agent-conversation-content .tool-group-items > .tool-event {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.tool-event > summary {
+  display: flex;
+  width: fit-content;
+  min-height: 20px;
+  gap: 4px;
+  align-items: center;
+  color: var(--zaw-description);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.tool-event > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-event > summary:hover,
+.tool-event[open] > summary {
+  color: var(--zaw-agents-panel-foreground);
+}
+
+.tool-event .tool-icon,
+.tool-event .tool-expando {
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.tool-event .tool-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-event .tool-summary {
+  min-width: 0;
+  max-width: min(520px, 55vw);
+  overflow: hidden;
+  color: var(--zaw-description);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-event .tool-summary:empty {
+  display: none;
+}
+
 .tool-event .tool-state {
   margin-left: auto;
   color: var(--zaw-description);
@@ -6,14 +188,121 @@
   text-transform: capitalize;
 }
 
-.approval-event footer {
+.tool-event .tool-expando {
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.tool-event[open] .tool-expando {
+  transform: rotate(90deg);
+}
+
+.tool-event .tool-detail {
+  box-sizing: border-box;
+  max-height: 160px;
+  margin-top: 2px;
+  padding: 7px 9px;
+  overflow: auto;
+  color: var(--zaw-description);
+  white-space: pre-wrap;
+  background: var(--zaw-agents-chat-request-background);
+  border: 1px solid var(--zaw-agents-chat-request-border);
+  border-radius: var(--zaw-corner-radius-medium);
+}
+
+.approval-event {
+  overflow: hidden;
+  background: transparent;
+  border: 1px solid var(--zaw-agents-chat-request-border);
+  border-radius: var(--zaw-corner-radius-medium);
+}
+
+.approval-event:focus-visible {
+  outline: 1px solid var(--zaw-focus-border);
+  outline-offset: 2px;
+}
+
+.approval-title {
+  display: flex;
+  min-height: 24px;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: var(--zaw-agents-font-size-body1);
+  font-weight: 600;
+  border-bottom: 1px solid var(--zaw-agents-chat-request-border);
+}
+
+.approval-icon {
+  font-size: var(--zaw-codicon-font-size-compact);
+}
+
+.approval-message {
+  box-sizing: border-box;
+  max-height: 180px;
+  padding: 6px 9px;
+  overflow: auto;
+  color: var(--zaw-agents-panel-foreground);
+  background: var(--zaw-agents-chat-request-background);
+  border-bottom: 1px solid var(--zaw-agents-chat-request-border);
+}
+
+.approval-command {
   display: flex;
   gap: 6px;
-  justify-content: flex-end;
-  margin-top: 9px;
+  align-items: flex-start;
+  color: var(--zaw-agents-panel-foreground);
+}
+
+.approval-command .codicon {
+  margin-top: 2px;
+  color: var(--zaw-description);
+}
+
+.approval-command code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-family: var(--zaw-monospace-font, "SFMono-Regular", Consolas, monospace);
+  white-space: pre-wrap;
+}
+
+.approval-description {
+  margin-top: 4px;
+  color: var(--zaw-description);
+}
+
+.approval-event footer {
+  display: flex;
+  min-height: 25px;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 8px;
 }
 
 .approval-state {
   color: var(--zaw-description);
   text-transform: capitalize;
+}
+
+.session-event.notification {
+  padding: 5px 8px;
+  color: var(--zaw-description);
+  background: var(--zaw-agents-chat-request-background);
+  border: 1px solid var(--zaw-agents-chat-request-border);
+  border-radius: var(--zaw-corner-radius-medium);
+}
+
+.session-event.notification.state-error {
+  color: var(--zaw-error);
+}
+
+.session-event.notification.state-warning {
+  color: var(--zaw-list-warning-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-event .tool-expando,
+  .tool-event-group .tool-expando {
+    transition: none;
+  }
 }

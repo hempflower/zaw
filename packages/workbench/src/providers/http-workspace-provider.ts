@@ -23,6 +23,10 @@ export class HTTPWorkspaceProvider implements IWorkspaceProvider {
     return this.client.request<Workspace[]>("/workspaces");
   }
 
+  buildLogs(buildID: string) {
+    return this.client.request<{ logs: string }>(`/builds/${buildID}/logs`);
+  }
+
   requestBuild(workspaceID: string, operation: WorkspaceBuildOperation) {
     return this.client.request<{ id: string }>(
       `/workspaces/${workspaceID}/builds`,

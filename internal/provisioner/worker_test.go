@@ -58,6 +58,46 @@ func TestWorkspaceRunningStopsWithoutDestroyingState(t *testing.T) {
 	}
 }
 
+func TestGitCredentialEnvironmentDoesNotPolluteCheckoutDirectory(t *testing.T) {
+	checkoutDirectory := t.TempDir()
+	environment, cleanup, err := gitCredentialEnvironment(&gitCredential{
+		Kind:   "ssh_key",
+		Secret: map[string]string{"privateKey": "test-private-key"},
+	})
+	if err != nil {
+		t.Fatalf("create Git credential environment: %v", err)
+	}
+	entries, err := os.ReadDir(checkoutDirectory)
+	if err != nil {
+		t.Fatalf("read checkout directory: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("checkout directory was polluted: %v", entries)
+	}
+	sshCommand := ""
+	for _, value := range environment {
+		if strings.HasPrefix(value, "GIT_SSH_COMMAND=") {
+			sshCommand = strings.TrimPrefix(value, "GIT_SSH_COMMAND=")
+		}
+	}
+	keyStart := strings.Index(sshCommand, "-i ")
+	keyEnd := strings.Index(sshCommand, " -o ")
+	if keyStart < 0 || keyEnd <= keyStart+3 {
+		t.Fatalf("SSH command does not reference a key: %q", sshCommand)
+	}
+	keyPath := sshCommand[keyStart+3 : keyEnd]
+	if filepath.Dir(keyPath) == checkoutDirectory {
+		t.Fatalf("credential was written into checkout directory: %s", keyPath)
+	}
+	if info, err := os.Stat(keyPath); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("credential key is not protected: %v, %v", info, err)
+	}
+	cleanup()
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
+		t.Fatalf("credential key was not removed: %v", err)
+	}
+}
+
 func TestNewPassesConfiguredDockerHostToTerraform(t *testing.T) {
 	t.Setenv("ZAW_DOCKER_HOST", "unix:///run/user/1000/docker.sock")
 	worker, err := New(Config{WorkRoot: t.TempDir()})
@@ -126,10 +166,6 @@ func TestIncusAgentCredentialInjectionKeepsTokenOutOfLogsAndArguments(t *testing
 	}))
 	defer server.Close()
 	directory := t.TempDir()
-	agentHostBinary := filepath.Join(directory, "zaw")
-	if err := os.WriteFile(agentHostBinary, []byte("test binary"), 0o755); err != nil {
-		t.Fatalf("write fake Agent Host binary: %v", err)
-	}
 	tracePath := filepath.Join(directory, "incus.trace")
 	binaryPath := filepath.Join(directory, "incus")
 	script := "#!/bin/sh\n"
@@ -141,9 +177,8 @@ func TestIncusAgentCredentialInjectionKeepsTokenOutOfLogsAndArguments(t *testing
 	var logs bytes.Buffer
 	worker := &Worker{
 		config: Config{
-			IncusBinary:     binaryPath,
-			AgentHostBinary: agentHostBinary,
-			ServerURL:       server.URL,
+			IncusBinary: binaryPath,
+			ServerURL:   server.URL,
 		},
 		client: &http.Client{},
 	}
@@ -166,7 +201,7 @@ func TestIncusAgentCredentialInjectionKeepsTokenOutOfLogsAndArguments(t *testing
 		strings.Contains(string(trace), "never-log-this") {
 		t.Fatal("Agent Host credential leaked into logs or command arguments")
 	}
-	if !strings.Contains(string(trace), "file push --mode=0755") ||
+	if strings.Contains(string(trace), "file push --mode=0755") ||
 		!strings.Contains(string(trace), "file push --mode=0600") ||
 		!strings.Contains(string(trace), "systemctl enable --now zaw-agent-host.service") {
 		t.Fatalf("unexpected Incus calls: %s", trace)

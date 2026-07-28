@@ -22,4 +22,33 @@ describe("DropdownPanelWidget", () => {
     root.querySelectorAll<HTMLButtonElement>("button")[1]?.click();
     expect(selected).toBe("one");
   });
+
+  it("uses roving tabindex and skips disabled items", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    new DropdownPanelWidget(root, {
+      sections: [
+        {
+          items: [
+            { label: "One" },
+            { disabled: true, label: "Disabled" },
+            { label: "Three" },
+          ],
+        },
+      ],
+    });
+    const buttons = Array.from(
+      root.querySelectorAll<HTMLButtonElement>("button"),
+    );
+    buttons[0].focus();
+    buttons[0].dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
+    );
+    expect(document.activeElement).toBe(buttons[2]);
+    buttons[2].dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "Home" }),
+    );
+    expect(document.activeElement).toBe(buttons[0]);
+    root.remove();
+  });
 });

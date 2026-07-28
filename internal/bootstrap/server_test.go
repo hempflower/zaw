@@ -62,6 +62,9 @@ func TestServerAppStartsAndStops(t *testing.T) {
 		"ZAW_AGENT_IDENTITY_SIGNING_KEY",
 		"test-agent-identity-signing-key-32-bytes",
 	)
+	t.Setenv("ZAW_PASSWORD", "test-password")
+	t.Setenv("ZAW_PROVISIONER_KEY", "test-provisioner-key")
+	t.Setenv("ZAW_AUTH_SIGNING_KEY", "test-browser-jwt-signing-key-32-bytes")
 	app := fx.New(
 		fx.NopLogger,
 		ServerModule(ServerConfig{Address: "127.0.0.1:0"}),

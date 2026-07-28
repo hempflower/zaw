@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/github/copilot-sdk/go v1.0.0-beta.8
+	github.com/github/copilot-sdk/go v1.0.8
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gorilla/websocket v1.5.3
@@ -24,6 +24,8 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/agext/levenshtein v1.2.2 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
+	github.com/coder/websocket v1.8.15 // indirect
+	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

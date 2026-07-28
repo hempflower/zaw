@@ -1,5 +1,6 @@
 import { ButtonWidget } from "./button";
 import { Emitter } from "./event";
+import { moveRovingFocus, setRovingTabStop } from "./keyboard-navigation";
 import { Widget, append, createElement } from "./widget";
 
 export type Tab = {
@@ -53,6 +54,19 @@ export class TabsWidget extends Widget {
       );
       append(tabs, ...Array.from(addRoot.childNodes));
     }
+    const labels = Array.from(
+      tabs.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    );
+    setRovingTabStop(
+      labels,
+      labels.find((label) => label.getAttribute("aria-selected") === "true"),
+    );
+    this.listen(tabs, "keydown", (event) => {
+      const before = document.activeElement;
+      if (!moveRovingFocus(event, labels, "horizontal")) return;
+      const target = document.activeElement as HTMLButtonElement;
+      if (target !== before) target.click();
+    });
     this.root.replaceChildren(tabs);
   }
 
@@ -60,11 +74,13 @@ export class TabsWidget extends Widget {
     const active = tab.id === this.options.activeID;
     const tabElement = createElement("div", {
       className: `zaw-tab ${active ? "active" : ""}`,
+    });
+    const label = createElement("button", {
+      className: "zaw-tab-label",
       role: "tab",
     });
-    tabElement.setAttribute("aria-selected", String(active));
-    const label = createElement("button", { className: "zaw-tab-label" });
     label.type = "button";
+    label.setAttribute("aria-selected", String(active));
     append(
       label,
       tab.icon
@@ -72,9 +88,17 @@ export class TabsWidget extends Widget {
         : null,
       document.createTextNode(tab.label),
     );
-    this.listen(label, "click", (event) =>
-      this._onDidSelect.fire({ id: tab.id, event }),
-    );
+    this.listen(label, "click", (event) => {
+      for (const candidate of this.root.querySelectorAll<HTMLElement>(
+        '[role="tab"]',
+      )) {
+        const selected = candidate === label;
+        candidate.setAttribute("aria-selected", String(selected));
+        candidate.tabIndex = selected ? 0 : -1;
+        candidate.closest(".zaw-tab")?.classList.toggle("active", selected);
+      }
+      this._onDidSelect.fire({ id: tab.id, event });
+    });
     tabElement.append(label);
     if (tab.closeable) {
       const closeRoot = createElement("span");

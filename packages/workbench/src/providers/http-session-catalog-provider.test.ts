@@ -19,6 +19,27 @@ describe("HTTP Session Catalog provider", () => {
       "/sessions?limit=200&cursor=opaque%2Bcursor",
     );
   });
+
+  it("scopes every page of a provider refresh", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [catalogItem("first")],
+        nextCursor: "next",
+      })
+      .mockResolvedValueOnce({ items: [] });
+    await new HTTPSessionCatalogProvider({
+      request,
+    } as unknown as HTTPClient).list("copilot");
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      "/sessions?limit=200&provider=copilot",
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "/sessions?limit=200&cursor=next&provider=copilot",
+    );
+  });
 });
 
 function catalogItem(resource: string) {
