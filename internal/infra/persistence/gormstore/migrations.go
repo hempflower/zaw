@@ -99,7 +99,7 @@ func Migrate(db *gorm.DB) error {
 				err = fmt.Errorf("release MySQL migration lock: lock was not held")
 			}
 		}()
-		return migrate(connection)
+		return migrate(connection.Session(&gorm.Session{NewDB: true}))
 	})
 }
 

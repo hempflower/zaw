@@ -61,6 +61,9 @@ func verifyConcurrentMigrations(t *testing.T, database *gorm.DB) {
 			t.Fatalf("concurrent migration: %v", err)
 		}
 	}
+	if database.Migrator().HasTable("null_int64") {
+		t.Fatal("migration lock query leaked its scan destination into the schema")
+	}
 }
 
 func verifyDatabaseBehavior(t *testing.T, database *gorm.DB) {
