@@ -12,21 +12,22 @@ stops the existing VM in place; a later start sets it back to true. Only
 
 ## Agent bootstrap
 
-The Provisioner supplies the immutable workspace ID and `running` lifecycle state. The
-template derives the Agent Host environment and init script from those inputs,
+The Provisioner supplies immutable Workspace context to the bundled Zaw
+Terraform Provider. The template reads `data.zaw_workspace.current` and derives
+the Agent Host environment and init script from that context,
 writes them with cloud-init, downloads the checksummed Agent Host directly from
 the Zaw control plane, installs the official GitHub Copilot CLI v1.0.75, and
 starts a systemd service. Relevant parameters:
 
 ```hcl
-zaw_server_url       = "ws://10.99.0.1:8080"
 zaw_agent_provider   = "copilot"
 zaw_copilot_cli_path = "/usr/local/bin/copilot"
 zaw_install_command  = "# optional Agent SDK dependency install command"
 ```
 
-`zaw_server_url` must be routable from the VM. Agent Host binaries are served by
-the control plane from the public, platform-scoped `/downloads/zaw/...` route;
+`ZAW_SERVER_URL` on the Provisioner must be routable from the VM. Agent Host
+binaries are served by the control plane from the public, platform-scoped
+`/downloads/zaw/...` route;
 the bootstrap verifies its SHA-256 response header before installation. After
 bootstrap, the Agent Host checks that route every 15 minutes and atomically
 installs a changed runtime. The download contains no Workspace credential and
@@ -55,15 +56,13 @@ isolated VM and volume. State is stored in the verification working directory.
 
 ## Provider setup
 
-The runnable template only requires the published `lxc/incus` provider. The
-companion `zaw_agent` provider resource is implemented in this repository for
-templates that need a reusable injection abstraction after that provider is
-published. Build it for local development with:
+The Provisioner installs its bundled Zaw Provider into an isolated Terraform
+filesystem mirror. No public Registry download is required. To test a standalone
+Provider build locally:
 
 ```sh
 go build -o terraform-provider-zaw ./cmd/terraform-provider-zaw
 ```
 
-For development, configure Terraform's `dev_overrides` to point at the
-directory containing that binary. It is intentionally not required by this
-template, because `terraform init` cannot install an unpublished provider.
+For development outside the Provisioner, configure a Terraform filesystem
+mirror or `dev_overrides` to point at the directory containing that binary.

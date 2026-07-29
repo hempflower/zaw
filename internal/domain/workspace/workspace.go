@@ -72,14 +72,18 @@ func (w Workspace) ValidateOperation(operation BuildOperation) error {
 }
 
 func (w Workspace) DesiredStateAfter(operation BuildOperation) DesiredState {
+	return DesiredStateForOperation(operation)
+}
+
+func DesiredStateForOperation(operation BuildOperation) DesiredState {
 	switch operation {
 	case Stop:
 		return DesiredStopped
 	case Delete:
 		return DesiredDeleted
-	case Start, RebuildFromCurrentTemplate:
+	case Create, Start, Reconfigure, RebuildFromCurrentTemplate, Repair:
 		return DesiredRunning
 	default:
-		return w.DesiredState
+		return ""
 	}
 }

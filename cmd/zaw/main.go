@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,15 +16,21 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/zaw-dev/zaw/internal/agenthost"
 	"github.com/zaw-dev/zaw/internal/bootstrap"
+	"github.com/zaw-dev/zaw/internal/interfaces/terraformprovider"
 	"github.com/zaw-dev/zaw/internal/provisioner"
+	"github.com/zaw-dev/zaw/internal/version"
 )
 
 func main() {
+	if strings.HasPrefix(filepath.Base(os.Args[0]), "terraform-provider-zaw") {
+		terraformprovider.Serve()
+		return
+	}
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
 		log.Fatal(fmt.Errorf("load .env: %w", err))
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("usage: zaw <server|provisioner|agent-host>")
+		log.Fatal("usage: zaw <server|provisioner|agent-host|terraform-provider|version>")
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -45,6 +53,11 @@ func main() {
 		name := flags.String("name", "", "Provisioner name")
 		workRoot := flags.String("work-root", "", "Provisioner working directory")
 		terraformBinary := flags.String("terraform", "", "Terraform executable")
+		terraformProviderBinary := flags.String(
+			"terraform-provider",
+			"",
+			"terraform-provider-zaw executable bundled into the local mirror",
+		)
 		terraformTimeout := flags.Duration("terraform-timeout", 0, "Terraform execution timeout")
 		pluginCache := flags.String("terraform-plugin-cache", "", "Terraform plugin cache directory")
 		retainFailed := flags.Bool(
@@ -66,6 +79,7 @@ func main() {
 			Name:                        *name,
 			WorkRoot:                    *workRoot,
 			TerraformBinary:             *terraformBinary,
+			TerraformProviderBinary:     *terraformProviderBinary,
 			TerraformTimeout:            *terraformTimeout,
 			PluginCacheDir:              *pluginCache,
 			RetainFailedWorkDirectories: *retainFailed,
@@ -100,6 +114,12 @@ func main() {
 			RegistrationTokenFile: *registrationTokenFile,
 		})
 		err = runApp(ctx, app, true)
+	case "terraform-provider":
+		terraformprovider.Serve()
+		return
+	case "version":
+		fmt.Println(version.Current)
+		return
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}

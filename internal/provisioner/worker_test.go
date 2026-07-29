@@ -12,16 +12,17 @@ import (
 	"time"
 )
 
-func TestWriteWorkspaceVariablesMergesSnapshotAndWorkspaceID(t *testing.T) {
+func TestWriteWorkspaceVariablesContainsOnlyTemplateParameters(t *testing.T) {
 	directory := t.TempDir()
 	build := buildPayload{
 		WorkspaceID: "workspace-1",
 		ParameterSnapshot: json.RawMessage(`{
 			"image":"alpine:3.21",
-			"workspace_id":"caller-cannot-override"
+			"workspace_id":"caller-cannot-override",
+			"zaw_workspace_running":false
 		}`),
 	}
-	if err := writeWorkspaceVariables(directory, build, "http://zaw.test"); err != nil {
+	if err := writeWorkspaceVariables(directory, build); err != nil {
 		t.Fatalf("write variables: %v", err)
 	}
 	payload, err := os.ReadFile(filepath.Join(directory, "zaw.auto.tfvars.json"))
@@ -35,26 +36,16 @@ func TestWriteWorkspaceVariablesMergesSnapshotAndWorkspaceID(t *testing.T) {
 	if variables["image"] != "alpine:3.21" {
 		t.Fatalf("image variable = %q", variables["image"])
 	}
-	if variables["workspace_id"] != "workspace-1" {
-		t.Fatalf("workspace ID = %q", variables["workspace_id"])
-	}
-	if variables["zaw_workspace_running"] != true {
-		t.Fatalf("workspace running = %q", variables["zaw_workspace_running"])
-	}
-	if variables["zaw_workspace_transition"] != "" {
-		t.Fatalf("workspace transition = %q", variables["zaw_workspace_transition"])
-	}
-	if variables["zaw_server_url"] != "http://zaw.test" {
-		t.Fatalf("server URL = %q", variables["zaw_server_url"])
-	}
-}
-
-func TestWorkspaceRunningStopsWithoutDestroyingState(t *testing.T) {
-	if got := workspaceRunning("stop"); got {
-		t.Fatal("stop must set running to false")
-	}
-	if got := workspaceRunning("start"); !got {
-		t.Fatal("start must set running to true")
+	for _, name := range []string{
+		"workspace_id",
+		"zaw_workspace_id",
+		"zaw_workspace_running",
+		"zaw_workspace_transition",
+		"zaw_server_url",
+	} {
+		if _, exists := variables[name]; exists {
+			t.Fatalf("platform context %q leaked into tfvars: %#v", name, variables)
+		}
 	}
 }
 
@@ -129,6 +120,10 @@ func TestNewConfiguresTerraformExecutionPolicy(t *testing.T) {
 	}
 	if !worker.config.RetainFailedWorkDirectories {
 		t.Fatal("failed work directory policy was not retained")
+	}
+	environment := strings.Join(worker.runner.Environment, "\n")
+	if !strings.Contains(environment, "TF_CLI_CONFIG_FILE=") {
+		t.Fatalf("bundled Provider mirror was not configured: %s", environment)
 	}
 }
 

@@ -1,31 +1,3 @@
-variable "workspace_id" {
-  type        = string
-  description = "The immutable Zaw Workspace identifier."
-}
-
-variable "zaw_workspace_id" {
-  type        = string
-  description = "The immutable Zaw Workspace identifier injected by the Provisioner."
-}
-
-variable "zaw_workspace_running" {
-  type        = bool
-  description = "Whether the existing container should be running; delete uses terraform destroy."
-  default     = true
-}
-
-variable "zaw_workspace_transition" {
-  type        = string
-  description = "The control-plane operation currently being applied."
-  default     = "create"
-}
-
-variable "zaw_server_url" {
-  type        = string
-  description = "Control-plane URL available to an Agent Host inside the workspace."
-  default     = ""
-}
-
 variable "zaw_agent_workspace_dir" {
   type        = string
   description = "Working directory passed to the Agent Host."

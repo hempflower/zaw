@@ -160,14 +160,20 @@ func TestControlPlaneCreatesPinnedWorkspaceAndClaimsBuild(t *testing.T) {
 		t.Fatalf("claim build status = %d: %s", claimed.Code, claimed.Body.String())
 	}
 	var claim struct {
-		ID    string                 `json:"id"`
-		Build storage.WorkspaceBuild `json:"build"`
+		ID    string `json:"id"`
+		Build struct {
+			storage.WorkspaceBuild
+			WorkspaceName string
+		} `json:"build"`
 	}
 	if err := json.NewDecoder(claimed.Body).Decode(&claim); err != nil {
 		t.Fatalf("decode claimed job: %v", err)
 	}
 	if claim.Build.Status != "claimed" || claim.Build.StartedAt == nil {
 		t.Fatalf("claimed build lifecycle is incomplete: %#v", claim.Build)
+	}
+	if claim.Build.WorkspaceName != "development" {
+		t.Fatalf("claimed build Workspace name = %q", claim.Build.WorkspaceName)
 	}
 	invalidEvent := request(
 		t,

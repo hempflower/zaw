@@ -16,10 +16,12 @@
 10. [Zaw Terraform Provider](architecture/terraform-provider-zaw.md)：Agent 注入资源与模板生命周期。
 11. [本地开发](development.md)：本机工具版本、Task 入口和环境配置。
 12. [里程碑验收记录](architecture/milestone-verification.md)：M0–M26 的门禁状态和直接证据。
+13. [Plan 评审设计（暂缓实现）](architecture/plan-review.md)：AHP 上游现状、候选私有扩展、范围批注交互与恢复实施条件。
+14. [发布流程](releasing.md)：版本一致性、门禁、GitHub Release 与 Terraform Registry 边界。
 
 ## 已确认的核心决策
 
-- Go 二进制以 server、provisioner、agent-host 三种角色运行。
+- Go 二进制以 server、provisioner、agent-host、terraform-provider 四种角色运行。
 - Browser 和 Electron 都直接连接 Server；共用 packages/workbench。
 - Agent Host 在 Workspace 内运行；它拥有 Session 状态与历史。
 - Agent Host 到 Server 的一条物理连接承载多个相互隔离的逻辑 AHP Peer。

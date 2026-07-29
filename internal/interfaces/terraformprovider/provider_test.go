@@ -65,6 +65,10 @@ func TestAgentLifecycleAndMetadata(t *testing.T) {
 			data.Get("startup_state"),
 		)
 	}
+	environment := data.Get("environment").(map[string]any)
+	if _, exists := environment["ZAW_WORKSPACE_TRANSITION"]; exists {
+		t.Fatal("build transition leaked into the stable Agent environment")
+	}
 	if err := data.Set("workspace_transition", "stop"); err != nil {
 		t.Fatalf("set stop transition: %v", err)
 	}
@@ -114,14 +118,16 @@ func TestAgentLifecycleAndMetadata(t *testing.T) {
 }
 
 func TestWorkspaceDataSourceMapsLifecycle(t *testing.T) {
-	data := schema.TestResourceDataRaw(t, workspaceDataSource().Schema, map[string]any{
-		"workspace_id": "workspace-1",
-		"transition":   "stop",
-	})
+	data := schema.TestResourceDataRaw(t, workspaceDataSource().Schema, nil)
 	diagnostics := readWorkspace(
 		context.Background(),
 		data,
-		configuration{serverURL: "https://zaw.example"},
+		configuration{
+			serverURL:           "https://zaw.example",
+			workspaceID:         "workspace-1",
+			workspaceName:       "workspace-name",
+			workspaceTransition: "stop",
+		},
 	)
 	if diagnostics.HasError() {
 		t.Fatalf("read Workspace: %v", diagnostics)
@@ -131,6 +137,26 @@ func TestWorkspaceDataSourceMapsLifecycle(t *testing.T) {
 	}
 	if data.Get("running") != false {
 		t.Fatalf("stopped Workspace running = %v", data.Get("running"))
+	}
+	if data.Get("name") != "workspace-name" || data.Get("transition") != "stop" {
+		t.Fatalf("Workspace context = %q/%q", data.Get("name"), data.Get("transition"))
+	}
+}
+
+func TestProviderRequiresWorkspaceContext(t *testing.T) {
+	t.Setenv("ZAW_SERVER_URL", "https://zaw.example")
+	t.Setenv("ZAW_WORKSPACE_ID", "")
+	t.Setenv("ZAW_WORKSPACE_NAME", "workspace-name")
+	t.Setenv("ZAW_WORKSPACE_TRANSITION", "start")
+	data := schema.TestResourceDataRaw(t, Provider().Schema, nil)
+	if _, diagnostics := configure(context.Background(), data); !diagnostics.HasError() {
+		t.Fatal("Provider accepted a missing Workspace ID")
+	}
+
+	t.Setenv("ZAW_WORKSPACE_ID", "workspace-1")
+	t.Setenv("ZAW_WORKSPACE_TRANSITION", "unknown")
+	if _, diagnostics := configure(context.Background(), data); !diagnostics.HasError() {
+		t.Fatal("Provider accepted an unsupported Workspace transition")
 	}
 }
 
@@ -146,6 +172,10 @@ func TestWorkspaceLifecycleMapping(t *testing.T) {
 		if transition == transitionDelete && desiredState != "deleted" {
 			t.Fatalf("delete desired state = %q", desiredState)
 		}
+		if transition != transitionStop && transition != transitionDelete &&
+			desiredState != "running" {
+			t.Fatalf("%s desired state = %q", transition, desiredState)
+		}
 	}
 	if _, err := workspaceDesiredState("unknown"); err == nil {
 		t.Fatal("unknown transition was accepted")
@@ -154,9 +184,10 @@ func TestWorkspaceLifecycleMapping(t *testing.T) {
 
 func TestAgentInitializationIncludesCopilotSDKConfiguration(t *testing.T) {
 	data := schema.TestResourceDataRaw(t, agentResource().Schema, map[string]any{
-		"workspace_id":     "workspace-1",
-		"agent_provider":   "copilot",
-		"copilot_cli_path": "/usr/local/bin/copilot",
+		"workspace_id":         "workspace-1",
+		"workspace_transition": "start",
+		"agent_provider":       "copilot",
+		"copilot_cli_path":     "/usr/local/bin/copilot",
 	})
 	diagnostics := setAgentOutputs(data, configuration{serverURL: "https://zaw.example"})
 	if diagnostics.HasError() {

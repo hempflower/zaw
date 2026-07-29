@@ -15,6 +15,7 @@ import (
 
 func agentResource() *schema.Resource {
 	return &schema.Resource{
+		SchemaVersion: 1,
 		CreateContext: agentCreate,
 		ReadContext:   agentRead,
 		UpdateContext: agentRead,
@@ -30,7 +31,7 @@ func agentResource() *schema.Resource {
 				Optional: true,
 				DefaultFunc: schema.EnvDefaultFunc(
 					"ZAW_WORKSPACE_TRANSITION",
-					transitionCreate,
+					nil,
 				),
 				ValidateFunc: validation.StringInSlice(workspaceTransitions(), false),
 			},
@@ -218,7 +219,6 @@ func setAgentOutputs(data *schema.ResourceData, config configuration) diag.Diagn
 		"ZAW_SERVER_URL":                    config.serverURL,
 		"ZAW_WORKSPACE_DIR":                 data.Get("directory").(string),
 		"ZAW_WORKSPACE_ID":                  workspaceID,
-		"ZAW_WORKSPACE_TRANSITION":          transition,
 	}
 	agentConfig, err := json.Marshal(map[string]any{
 		"arch":          data.Get("arch"),

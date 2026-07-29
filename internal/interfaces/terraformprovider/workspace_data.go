@@ -11,22 +11,20 @@ import (
 
 func workspaceDataSource() *schema.Resource {
 	return &schema.Resource{
-		ReadContext: readWorkspace,
+		SchemaVersion: 1,
+		ReadContext:   readWorkspace,
 		Schema: map[string]*schema.Schema{
 			"workspace_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("ZAW_WORKSPACE_ID", nil),
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 			"name": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("ZAW_WORKSPACE_NAME", ""),
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 			"transition": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("ZAW_WORKSPACE_TRANSITION", transitionCreate),
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 			"desired_state": {Type: schema.TypeString, Computed: true},
 			"running":       {Type: schema.TypeBool, Computed: true},
@@ -48,11 +46,8 @@ func readWorkspace(
 	if !ok {
 		return diag.Errorf("zaw provider configuration is unavailable")
 	}
-	workspaceID := data.Get("workspace_id").(string)
-	if workspaceID == "" {
-		return diag.Errorf("zaw_workspace requires workspace_id or ZAW_WORKSPACE_ID")
-	}
-	transition := data.Get("transition").(string)
+	workspaceID := config.workspaceID
+	transition := config.workspaceTransition
 	desiredState, err := workspaceDesiredState(transition)
 	if err != nil {
 		return diag.FromErr(err)
@@ -62,6 +57,9 @@ func readWorkspace(
 		return diag.FromErr(err)
 	}
 	values := map[string]any{
+		"workspace_id":   workspaceID,
+		"name":           config.workspaceName,
+		"transition":     transition,
 		"desired_state":  desiredState,
 		"running":        running,
 		"server_url":     config.serverURL,

@@ -1,6 +1,10 @@
 package terraformprovider
 
-import "fmt"
+import (
+	"fmt"
+
+	domainworkspace "github.com/zaw-dev/zaw/internal/domain/workspace"
+)
 
 const (
 	transitionCreate      = "create"
@@ -13,17 +17,11 @@ const (
 )
 
 func workspaceDesiredState(transition string) (string, error) {
-	switch transition {
-	case transitionStop:
-		return "stopped", nil
-	case transitionDelete:
-		return "deleted", nil
-	case transitionCreate, transitionStart, transitionReconfigure,
-		transitionRebuild, transitionRepair:
-		return "running", nil
-	default:
+	operation, err := domainworkspace.ParseBuildOperation(transition)
+	if err != nil {
 		return "", fmt.Errorf("unsupported Workspace transition %q", transition)
 	}
+	return string(domainworkspace.DesiredStateForOperation(operation)), nil
 }
 
 func workspaceRunning(transition string) (bool, error) {
