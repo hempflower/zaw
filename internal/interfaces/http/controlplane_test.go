@@ -263,6 +263,7 @@ func TestControlPlaneCreatesPinnedWorkspaceAndClaimsBuild(t *testing.T) {
 		t.Fatalf("connect Agent Host before stop: %v", err)
 	}
 	defer host.Close()
+	waitTestAHPHostOnline(t, server.ahp, workspaceIDs["id"])
 	stopBuild := request(
 		t,
 		server.Handler(),

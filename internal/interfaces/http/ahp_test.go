@@ -136,13 +136,7 @@ func TestAHPGatewayForwardsFramesWithoutMutation(t *testing.T) {
 	}
 	defer host.Close()
 
-	client, _, err := websocket.DefaultDialer.Dial(
-		baseURL+"/api/v1/workspaces/workspace-1/ahp",
-		nil,
-	)
-	if err != nil {
-		t.Fatalf("connect workbench: %v", err)
-	}
+	client := dialTestWorkspaceSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
 	defer client.Close()
 	host.SetReadDeadline(time.Now().Add(time.Second))
 	_, openPayload, err := host.ReadMessage()
@@ -222,6 +216,7 @@ func TestAHPGatewayLetsNewestDuplicateHostTakeOver(t *testing.T) {
 		t.Fatalf("connect first host: %v", err)
 	}
 	defer first.Close()
+	waitTestAHPHostOnline(t, server.ahp, "workspace-1")
 	second, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
 	if err != nil {
 		t.Fatalf("connect replacement host: %v", err)
@@ -268,4 +263,16 @@ func TestAgentHostStatusTracksLiveAHPConnection(t *testing.T) {
 	if got := server.agentHostState(workspaceID); got != "offline" {
 		t.Fatalf("disconnected status = %q, want offline", got)
 	}
+}
+
+func waitTestAHPHostOnline(t *testing.T, gateway *ahpGateway, workspaceID string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if gateway.isOnline(workspaceID) {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("Agent Host %s did not register before deadline", workspaceID)
 }

@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -19,11 +20,11 @@ func TestAHPMuxIsolatesEqualJSONRPCIDsAndClientClose(t *testing.T) {
 	host := dialTestSocket(t, baseURL+"/api/v1/agent-hosts/workspace-1/ahp")
 	defer host.Close()
 
-	first := dialTestSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
+	first := dialTestWorkspaceSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
 	firstOpen := readTestMuxFrame(t, host)
 	acknowledgeTestStream(t, host, firstOpen)
 	defer first.Close()
-	second := dialTestSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
+	second := dialTestWorkspaceSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
 	secondOpen := readTestMuxFrame(t, host)
 	acknowledgeTestStream(t, host, secondOpen)
 	defer second.Close()
@@ -129,7 +130,7 @@ func TestAgentHostDisconnectClosesAllMuxStreams(t *testing.T) {
 	host := dialTestSocket(t, baseURL+"/api/v1/agent-hosts/workspace-1/ahp")
 	clients := make([]*websocket.Conn, 0, 2)
 	for index := 0; index < 2; index++ {
-		client := dialTestSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
+		client := dialTestWorkspaceSocket(t, baseURL+"/api/v1/workspaces/workspace-1/ahp")
 		open := readTestMuxFrame(t, host)
 		acknowledgeTestStream(t, host, open)
 		clients = append(clients, client)
@@ -153,6 +154,26 @@ func dialTestSocket(t *testing.T, endpoint string) *websocket.Conn {
 		t.Fatal(err)
 	}
 	return connection
+}
+
+func dialTestWorkspaceSocket(t *testing.T, endpoint string) *websocket.Conn {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		connection, response, err := websocket.DefaultDialer.Dial(endpoint, nil)
+		if err == nil {
+			return connection
+		}
+		if response != nil {
+			_ = response.Body.Close()
+			if response.StatusCode != http.StatusServiceUnavailable {
+				t.Fatalf("connect Workbench AHP socket: %v", err)
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("Agent Host did not register before deadline")
+	return nil
 }
 
 func readTestMuxFrame(t *testing.T, connection *websocket.Conn) ahpmux.Frame {
