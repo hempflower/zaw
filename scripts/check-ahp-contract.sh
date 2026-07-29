@@ -8,6 +8,7 @@ module=github.com/microsoft/agent-host-protocol/clients/go
 module_version=$(go list -m -f '{{.Version}}' "$module")
 module_metadata=$(go list -m -json "$module@$AHP_GO_MODULE_VERSION")
 module_commit=$(sed -n 's/^[[:space:]]*"Hash": "\([^"]*\)",*$/\1/p' <<<"$module_metadata")
+go mod download "$module@$AHP_GO_MODULE_VERSION"
 module_directory=$(go list -m -f '{{.Dir}}' "$module")
 sdk_protocol_version=$(sed -n \
   's/^const ProtocolVersion = "\([^"]*\)"$/\1/p' \
