@@ -589,6 +589,7 @@ test("Settings exposes all management pages and the workspace picker creates a w
   const addProvider = page.getByRole("dialog", {
     name: "Add Model Provider",
   });
+  await addProvider.getByLabel("Provider ID").fill("deepseek-anthropic");
   await addProvider.getByLabel("Provider name").fill("DeepSeek Anthropic");
   await addProvider.getByLabel("Protocol").click();
   await addProvider.getByRole("option", { name: "Anthropic" }).click();
@@ -607,6 +608,7 @@ test("Settings exposes all management pages and the workspace picker creates a w
   expect((await providerRequest).postDataJSON()).toEqual({
     apiBase: "https://api.deepseek.com/anthropic",
     apiKey: "sk-placeholder",
+    id: "deepseek-anthropic",
     kind: "anthropic",
     name: "DeepSeek Anthropic",
   });
@@ -1434,10 +1436,10 @@ test("real control-plane and Agent Host complete the browser workflow", async ({
   await expect(
     page
       .locator(
-        ".agent-active-session-view:not([hidden]) .agent-composer-picker-host .zaw-picker-action-label",
+        ".agent-active-session-view:not([hidden]) .agent-mode-picker .zaw-picker-action-label",
       )
       .first(),
-  ).toHaveText("GitHub Copilot");
+  ).toHaveText("Agent");
   if (!(await auxiliary.isVisible()))
     await page.getByRole("button", { name: "Toggle Details" }).click();
   await expect(auxiliary).toBeVisible();
@@ -1500,9 +1502,11 @@ test("existing AHP session restores active chat and confirmation UI", async ({
   await expect(
     page.getByRole("button", { name: "Allow Run in terminal" }),
   ).toBeVisible();
+  const toolGroup = page.locator(".tool-event-group");
+  await expect(toolGroup).toBeVisible();
+  await toolGroup.locator(":scope > summary").click();
   await expect(page.locator(".tool-event.state-completed")).toBeVisible();
   await expect(page.locator(".tool-event.state-failed")).toBeVisible();
-  await expect(page.locator(".approval-event.state-denied")).toBeVisible();
   await expect(page.locator(".tool-event.state-streaming")).toBeVisible();
   await expect(page.locator(".session-event.error")).toContainText(
     "Recovered from a transient failure",

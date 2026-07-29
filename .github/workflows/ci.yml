@@ -44,11 +44,15 @@ jobs:
         run: go install github.com/go-task/task/v3/cmd/task@v3.44.0
       - name: Install frontend dependencies
         run: task deps -- --frozen-lockfile
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
       - name: Validate vendored protocols
         run: task check-protocols
       - name: Run quality checks
         run: task lint
       - name: Run tests
         run: task test
+      - name: Run browser end-to-end tests
+        run: pnpm test:e2e
       - name: Build
         run: task build
