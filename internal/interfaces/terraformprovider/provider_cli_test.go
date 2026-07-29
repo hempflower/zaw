@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	terra "github.com/zaw-dev/zaw/internal/infra/terraform"
 )
 
 func TestProviderLoadsThroughLocalTerraformCLI(t *testing.T) {
@@ -26,40 +28,28 @@ func TestProviderLoadsThroughLocalTerraformCLI(t *testing.T) {
 		"build",
 		"-o",
 		providerBinary,
-		"./cmd/terraform-provider-zaw",
+		"./cmd/zaw",
 	)
 	build.Dir = repositoryRoot
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build Provider: %v\n%s", err, output)
 	}
-	cliConfig := `provider_installation {
-  dev_overrides {
-    "zaw.local/dev/zaw" = "` + providerDirectory + `"
-  }
-  direct {}
-}
-`
-	cliConfigPath := filepath.Join(directory, "terraform.rc")
-	if err := os.WriteFile(cliConfigPath, []byte(cliConfig), 0o600); err != nil {
-		t.Fatalf("write Terraform CLI config: %v", err)
+	cliConfigPath, err := terra.InstallBundledProvider(directory, providerBinary)
+	if err != nil {
+		t.Fatalf("install Provider mirror: %v", err)
 	}
 	configuration := `terraform {
   required_providers {
     zaw = {
-      source = "zaw.local/dev/zaw"
+      source  = "zaw-dev/zaw"
+      version = "~> 0.2"
     }
   }
 }
 
-provider "zaw" {
-  server_url         = "https://zaw.example"
-  agent_host_base_url = "wss://zaw.example"
-}
+provider "zaw" {}
 
-data "zaw_workspace" "current" {
-  workspace_id = "workspace-cli"
-  transition   = "stop"
-}
+data "zaw_workspace" "current" {}
 
 resource "zaw_agent" "main" {
   workspace_id         = data.zaw_workspace.current.workspace_id
@@ -95,6 +85,11 @@ output "desired_state" {
 		os.Environ(),
 		"TF_CLI_CONFIG_FILE="+cliConfigPath,
 		"TF_IN_AUTOMATION=1",
+		"ZAW_SERVER_URL=https://zaw.example",
+		"ZAW_AGENT_HOST_BASE_URL=wss://zaw.example",
+		"ZAW_WORKSPACE_ID=workspace-cli",
+		"ZAW_WORKSPACE_NAME=workspace-cli",
+		"ZAW_WORKSPACE_TRANSITION=stop",
 	)
 	runTerraform := func(arguments ...string) string {
 		t.Helper()
@@ -107,6 +102,7 @@ output "desired_state" {
 		}
 		return string(output)
 	}
+	runTerraform("init", "-input=false")
 	runTerraform("apply", "-auto-approve", "-input=false")
 	agentID := strings.TrimSpace(runTerraform("output", "-raw", "agent_id"))
 	if agentID != "workspace-cli/agent" {

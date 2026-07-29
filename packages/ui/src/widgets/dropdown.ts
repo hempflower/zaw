@@ -143,7 +143,11 @@ function verticalClippingBounds(element: HTMLElement): {
 } {
   let top = 0;
   let bottom = window.innerHeight;
-  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+  for (
+    let parent = element.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
     const style = window.getComputedStyle(parent);
     const overflow = `${style.overflow} ${style.overflowY}`;
     if (!/(auto|scroll|hidden|clip)/.test(overflow)) continue;

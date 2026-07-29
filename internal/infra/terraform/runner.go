@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	domainworkspace "github.com/zaw-dev/zaw/internal/domain/workspace"
 )
 
 const planFileName = ".zaw.tfplan"
@@ -27,11 +29,18 @@ type StateConfig struct {
 	Directory string
 }
 
+type WorkspaceContext struct {
+	ID               string
+	Name             string
+	Transition       string
+	ServerURL        string
+	AgentHostBaseURL string
+}
+
 func (r Runner) Execute(
 	ctx context.Context,
 	workingDirectory string,
-	workspaceID string,
-	operation string,
+	workspace WorkspaceContext,
 	logs io.Writer,
 ) (map[string]any, error) {
 	executionContext, cancel := context.WithTimeout(ctx, r.timeout())
@@ -40,11 +49,11 @@ func (r Runner) Execute(
 	if binary == "" {
 		binary = "terraform"
 	}
-	environment, err := r.environment()
+	environment, err := r.environment(workspace)
 	if err != nil {
 		return nil, err
 	}
-	stateArguments, err := r.State.initArguments(workspaceID)
+	stateArguments, err := r.State.initArguments(workspace.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -59,30 +68,23 @@ func (r Runner) Execute(
 	); err != nil {
 		return nil, err
 	}
-	if destroysResources(operation) {
-		err := r.command(
-			executionContext,
-			workingDirectory,
-			logs,
-			environment,
-			binary,
-			"destroy",
-			"-auto-approve",
-			"-input=false",
-		)
-		return map[string]any{}, err
-	}
 	planPath := filepath.Join(workingDirectory, planFileName)
 	defer func() { _ = os.Remove(planPath) }()
+	planArguments := []string{
+		"plan",
+		"-input=false",
+		"-out=" + planPath,
+	}
+	if destroysResources(workspace.Transition) {
+		planArguments = append(planArguments, "-destroy")
+	}
 	if err := r.command(
 		executionContext,
 		workingDirectory,
 		logs,
 		environment,
 		binary,
-		"plan",
-		"-input=false",
-		"-out="+planPath,
+		planArguments...,
 	); err != nil {
 		return nil, err
 	}
@@ -99,6 +101,9 @@ func (r Runner) Execute(
 	); err != nil {
 		return nil, err
 	}
+	if destroysResources(workspace.Transition) {
+		return map[string]any{}, nil
+	}
 	return r.outputs(executionContext, workingDirectory, environment, binary)
 }
 
@@ -109,8 +114,32 @@ func (r Runner) timeout() time.Duration {
 	return 30 * time.Minute
 }
 
-func (r Runner) environment() ([]string, error) {
+func (r Runner) environment(workspace WorkspaceContext) ([]string, error) {
 	environment := append([]string{}, r.Environment...)
+	if workspace.ID == "" {
+		return nil, fmt.Errorf("Terraform Workspace context requires an ID")
+	}
+	if workspace.Name == "" {
+		return nil, fmt.Errorf("Terraform Workspace context requires a name")
+	}
+	if _, err := domainworkspace.ParseBuildOperation(workspace.Transition); err != nil {
+		return nil, err
+	}
+	if workspace.ServerURL == "" {
+		return nil, fmt.Errorf("Terraform Workspace context requires a Server URL")
+	}
+	environment = append(environment,
+		"ZAW_WORKSPACE_ID="+workspace.ID,
+		"ZAW_WORKSPACE_NAME="+workspace.Name,
+		"ZAW_WORKSPACE_TRANSITION="+workspace.Transition,
+		"ZAW_SERVER_URL="+strings.TrimRight(workspace.ServerURL, "/"),
+	)
+	if workspace.AgentHostBaseURL != "" {
+		environment = append(
+			environment,
+			"ZAW_AGENT_HOST_BASE_URL="+strings.TrimRight(workspace.AgentHostBaseURL, "/"),
+		)
+	}
 	if r.PluginCacheDir == "" {
 		return environment, nil
 	}
@@ -149,7 +178,7 @@ func (r Runner) outputs(
 	command := exec.CommandContext(ctx, binary, "output", "-json")
 	configureProcessGroup(command)
 	command.Dir = workingDirectory
-	command.Env = append(os.Environ(), environment...)
+	command.Env = terraformEnvironment(environment)
 	payload, err := command.Output()
 	if err != nil {
 		if ctx.Err() != nil {
@@ -182,13 +211,14 @@ func (r Runner) command(
 	binary string,
 	args ...string,
 ) error {
-	redactedLogs := newRedactingWriter(logs, r.redactions(environment))
+	commandEnvironment := terraformEnvironment(environment)
+	redactedLogs := newRedactingWriter(logs, r.redactions(commandEnvironment))
 	defer func() { _ = redactedLogs.Flush() }()
 	_, _ = fmt.Fprintf(redactedLogs, "$ %s %s\n", binary, strings.Join(args, " "))
 	command := exec.CommandContext(ctx, binary, args...)
 	configureProcessGroup(command)
 	command.Dir = workingDirectory
-	command.Env = append(os.Environ(), environment...)
+	command.Env = commandEnvironment
 	command.Stdout = redactedLogs
 	command.Stderr = redactedLogs
 	if err := command.Run(); err != nil {
@@ -198,6 +228,38 @@ func (r Runner) command(
 		return fmt.Errorf("terraform %s: %w", args[0], err)
 	}
 	return nil
+}
+
+func terraformEnvironment(overrides []string) []string {
+	overrideNames := make(map[string]struct{}, len(overrides))
+	lastOverride := make(map[string]int, len(overrides))
+	for index, variable := range overrides {
+		name, _, found := strings.Cut(variable, "=")
+		if !found {
+			continue
+		}
+		overrideNames[name] = struct{}{}
+		lastOverride[name] = index
+	}
+	environment := make([]string, 0, len(os.Environ())+len(overrides))
+	for _, variable := range os.Environ() {
+		name, _, _ := strings.Cut(variable, "=")
+		if strings.HasPrefix(name, "ZAW_") {
+			continue
+		}
+		if _, overridden := overrideNames[name]; overridden {
+			continue
+		}
+		environment = append(environment, variable)
+	}
+	for index, variable := range overrides {
+		name, _, found := strings.Cut(variable, "=")
+		if found && lastOverride[name] != index {
+			continue
+		}
+		environment = append(environment, variable)
+	}
+	return environment
 }
 
 func (r Runner) redactions(environment []string) []string {

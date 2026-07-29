@@ -85,10 +85,30 @@ func TestAgentModeMappings(t *testing.T) {
 		sessionMode rpc.SessionMode
 		sendMode    copilotsdk.AgentMode
 	}{
-		{name: "interactive", input: "interactive", sessionMode: rpc.SessionModeInteractive, sendMode: copilotsdk.AgentModeInteractive},
-		{name: "plan", input: "plan", sessionMode: rpc.SessionModePlan, sendMode: copilotsdk.AgentModePlan},
-		{name: "autopilot", input: "autopilot", sessionMode: rpc.SessionModeAutopilot, sendMode: copilotsdk.AgentModeAutopilot},
-		{name: "unknown defaults to interactive", input: "unknown", sessionMode: rpc.SessionModeInteractive, sendMode: copilotsdk.AgentModeInteractive},
+		{
+			name:        "interactive",
+			input:       "interactive",
+			sessionMode: rpc.SessionModeInteractive,
+			sendMode:    copilotsdk.AgentModeInteractive,
+		},
+		{
+			name:        "plan",
+			input:       "plan",
+			sessionMode: rpc.SessionModePlan,
+			sendMode:    copilotsdk.AgentModePlan,
+		},
+		{
+			name:        "autopilot",
+			input:       "autopilot",
+			sessionMode: rpc.SessionModeAutopilot,
+			sendMode:    copilotsdk.AgentModeAutopilot,
+		},
+		{
+			name:        "unknown defaults to interactive",
+			input:       "unknown",
+			sessionMode: rpc.SessionModeInteractive,
+			sendMode:    copilotsdk.AgentModeInteractive,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

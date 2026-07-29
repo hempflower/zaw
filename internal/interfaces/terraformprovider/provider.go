@@ -2,6 +2,7 @@ package terraformprovider
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -10,8 +11,11 @@ import (
 )
 
 type configuration struct {
-	serverURL        string
-	agentHostBaseURL string
+	serverURL           string
+	agentHostBaseURL    string
+	workspaceID         string
+	workspaceName       string
+	workspaceTransition string
 }
 
 func Serve() {
@@ -51,8 +55,23 @@ func configure(_ context.Context, data *schema.ResourceData) (any, diag.Diagnost
 	if agentHostBaseURL == "" {
 		agentHostBaseURL = serverURL
 	}
+	workspaceID := strings.TrimSpace(os.Getenv("ZAW_WORKSPACE_ID"))
+	if workspaceID == "" {
+		return nil, diag.Errorf("zaw provider requires ZAW_WORKSPACE_ID")
+	}
+	workspaceName := strings.TrimSpace(os.Getenv("ZAW_WORKSPACE_NAME"))
+	if workspaceName == "" {
+		return nil, diag.Errorf("zaw provider requires ZAW_WORKSPACE_NAME")
+	}
+	workspaceTransition := strings.TrimSpace(os.Getenv("ZAW_WORKSPACE_TRANSITION"))
+	if _, err := workspaceDesiredState(workspaceTransition); err != nil {
+		return nil, diag.FromErr(err)
+	}
 	return configuration{
-		serverURL:        serverURL,
-		agentHostBaseURL: agentHostBaseURL,
+		serverURL:           serverURL,
+		agentHostBaseURL:    agentHostBaseURL,
+		workspaceID:         workspaceID,
+		workspaceName:       workspaceName,
+		workspaceTransition: workspaceTransition,
 	}, nil
 }

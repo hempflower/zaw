@@ -2,6 +2,10 @@ terraform {
   required_version = ">= 1.6.0"
 
   required_providers {
+    zaw = {
+      source  = "zaw-dev/zaw"
+      version = "~> 0.2"
+    }
     incus = {
       source  = "lxc/incus"
       version = "~> 1.1"
@@ -11,22 +15,24 @@ terraform {
   backend "local" {}
 }
 
+provider "zaw" {}
 provider "incus" {}
 
-locals {
-  agent_environment = {
-    ZAW_AGENT_PROVIDER                = var.zaw_agent_provider
-    ZAW_SERVER_URL                    = var.zaw_server_url
-    ZAW_WORKSPACE_DIR                 = var.zaw_agent_workspace_dir
-    ZAW_WORKSPACE_ID                  = var.zaw_workspace_id
-    ZAW_AGENT_REGISTRATION_TOKEN_FILE = "/etc/zaw/registration.token"
-    ZAW_COPILOT_CLI_PATH              = var.zaw_copilot_cli_path
-    ZAW_AGENT_AUTO_UPDATE             = "true"
-  }
+data "zaw_workspace" "current" {}
 
+resource "zaw_agent" "main" {
+  workspace_id         = data.zaw_workspace.current.workspace_id
+  workspace_transition = data.zaw_workspace.current.transition
+  directory            = var.zaw_agent_workspace_dir
+  agent_provider       = var.zaw_agent_provider
+  copilot_cli_path     = var.zaw_copilot_cli_path
+  host_command         = var.zaw_agent_host_command
+}
+
+locals {
   agent_environment_file = join("\n", [
-    for name in sort(keys(local.agent_environment)) :
-    "${name}=${jsonencode(local.agent_environment[name])}"
+    for name in sort(keys(zaw_agent.main.environment)) :
+    "${name}=${jsonencode(zaw_agent.main.environment[name])}"
   ])
 
   agent_init_script = <<-SCRIPT
@@ -107,7 +113,7 @@ locals {
 }
 
 resource "incus_storage_volume" "workspace_data" {
-  name = "zaw-${var.zaw_workspace_id}-workspace"
+  name = "zaw-${data.zaw_workspace.current.workspace_id}-workspace"
   pool = var.incus_storage_pool
 
   lifecycle {
@@ -116,20 +122,20 @@ resource "incus_storage_volume" "workspace_data" {
 }
 
 resource "incus_instance" "workspace" {
-  name     = "zaw-${var.zaw_workspace_id}"
+  name     = "zaw-${data.zaw_workspace.current.workspace_id}"
   image    = var.image
   profiles = [var.incus_profile]
-  running  = var.zaw_workspace_running
+  running  = data.zaw_workspace.current.running
   type     = "virtual-machine"
 
   config = {
-    "boot.autostart"          = tostring(var.zaw_workspace_running)
+    "boot.autostart"          = tostring(data.zaw_workspace.current.running)
     "cloud-init.user-data"    = local.cloud_config
     "limits.cpu"              = tostring(var.cpu)
     "limits.memory"           = var.memory
     "security.secureboot"     = "false"
-    "user.zaw.workspace_id"   = var.zaw_workspace_id
-    "user.zaw.workspace_name" = var.workspace_id
+    "user.zaw.workspace_id"   = data.zaw_workspace.current.workspace_id
+    "user.zaw.workspace_name" = data.zaw_workspace.current.name
   }
 
   device {

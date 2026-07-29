@@ -66,6 +66,9 @@ class MockWebSocket {
             resource: request.params.channel,
             state: {
               defaultChat: "ahp-chat:/default",
+              _meta: {
+                zaw_todos: { version: 1, items: [] },
+              },
               changesets: [
                 {
                   uriTemplate: "ahp-changeset:/working-tree",
@@ -294,6 +297,8 @@ describe("AHPClient", () => {
       location: { protocol: "http:", host: "zaw.test" },
     });
     const client = await AHPClient.connect("workspace-1");
+    const actions: Array<Record<string, unknown>> = [];
+    client.onAction((event) => actions.push(event.action));
     const created = await client.createSession("AHP chat", "copilot");
     await client.promptSession(created.resource, {
       text: "hello",
@@ -359,6 +364,12 @@ describe("AHPClient", () => {
         "chat/toolCallConfirmed",
       ]),
     );
+    expect(actions).toContainEqual({
+      type: "session/snapshot",
+      state: expect.objectContaining({
+        _meta: { zaw_todos: { version: 1, items: [] } },
+      }),
+    });
   });
 
   it("uses standard Changeset snapshots and operations", async () => {

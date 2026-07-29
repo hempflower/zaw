@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -41,6 +42,108 @@ func TestRunnerPassesConfiguredDockerHostAsEnvironment(t *testing.T) {
 	environment := strings.Join(runner.Environment, " ")
 	if !strings.Contains(environment, "DOCKER_HOST=unix:///run/user/1000/docker.sock") {
 		t.Fatalf("Docker host environment missing: %s", environment)
+	}
+}
+
+func TestInstallBundledProviderCreatesFilesystemMirror(t *testing.T) {
+	directory := t.TempDir()
+	providerBinary := writeFakeTerraform(t, directory, "")
+	configurationPath, err := InstallBundledProvider(directory, providerBinary)
+	if err != nil {
+		t.Fatalf("install bundled Provider: %v", err)
+	}
+	configuration, err := os.ReadFile(configurationPath)
+	if err != nil {
+		t.Fatalf("read Terraform CLI configuration: %v", err)
+	}
+	if !strings.Contains(string(configuration), ProviderSource) ||
+		!strings.Contains(string(configuration), "filesystem_mirror") {
+		t.Fatalf("Terraform CLI configuration = %s", configuration)
+	}
+	providerPath := filepath.Join(
+		directory,
+		"terraform-provider-mirror",
+		ProviderSource,
+		ProviderVersion,
+		runtime.GOOS+"_"+runtime.GOARCH,
+		"terraform-provider-zaw_v"+ProviderVersion,
+	)
+	if _, err := os.Stat(providerPath); err != nil {
+		t.Fatalf("bundled Provider is unavailable: %v", err)
+	}
+	if _, err := InstallBundledProvider(directory, providerBinary); err != nil {
+		t.Fatalf("reinstall bundled Provider: %v", err)
+	}
+}
+
+func TestTerraformEnvironmentExcludesHostZawSecrets(t *testing.T) {
+	t.Setenv("ZAW_PROVISIONER_KEY", "provisioner-secret")
+	t.Setenv("AWS_REGION", "us-test-1")
+	t.Setenv("TF_CLI_CONFIG_FILE", "/host/terraform.tfrc")
+	environment := terraformEnvironment([]string{
+		"ZAW_TERRAFORM_TRACE=stale",
+		"ZAW_TERRAFORM_TRACE=explicit",
+		"TF_CLI_CONFIG_FILE=/zaw/terraform.tfrc",
+	})
+	joined := strings.Join(environment, "\n")
+	if strings.Contains(joined, "ZAW_PROVISIONER_KEY=") {
+		t.Fatalf("host Zaw secret was passed to Terraform: %s", joined)
+	}
+	if !strings.Contains(joined, "AWS_REGION=us-test-1") {
+		t.Fatalf("provider environment was not preserved: %s", joined)
+	}
+	if !strings.Contains(joined, "ZAW_TERRAFORM_TRACE=explicit") {
+		t.Fatalf("explicit Terraform environment was not preserved: %s", joined)
+	}
+	if strings.Contains(joined, "ZAW_TERRAFORM_TRACE=stale") ||
+		strings.Contains(joined, "TF_CLI_CONFIG_FILE=/host/terraform.tfrc") ||
+		!strings.Contains(joined, "TF_CLI_CONFIG_FILE=/zaw/terraform.tfrc") {
+		t.Fatalf("explicit Terraform overrides did not win: %s", joined)
+	}
+}
+
+func TestRunnerBuildsExplicitWorkspaceEnvironment(t *testing.T) {
+	t.Setenv("ZAW_WORKSPACE_ID", "host-workspace")
+	runner := Runner{Environment: []string{"DOCKER_HOST=unix:///docker.sock"}}
+	environment, err := runner.environment(WorkspaceContext{
+		ID:               "workspace-1",
+		Name:             "example",
+		Transition:       "stop",
+		ServerURL:        "https://zaw.example/",
+		AgentHostBaseURL: "wss://agents.example/",
+	})
+	if err != nil {
+		t.Fatalf("build Terraform environment: %v", err)
+	}
+	joined := strings.Join(terraformEnvironment(environment), "\n")
+	for _, expected := range []string{
+		"ZAW_WORKSPACE_ID=workspace-1",
+		"ZAW_WORKSPACE_NAME=example",
+		"ZAW_WORKSPACE_TRANSITION=stop",
+		"ZAW_SERVER_URL=https://zaw.example",
+		"ZAW_AGENT_HOST_BASE_URL=wss://agents.example",
+		"DOCKER_HOST=unix:///docker.sock",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("Terraform environment is missing %q: %s", expected, joined)
+		}
+	}
+	if strings.Contains(joined, "ZAW_WORKSPACE_ID=host-workspace") {
+		t.Fatalf("host Workspace context leaked into Terraform: %s", joined)
+	}
+}
+
+func TestRunnerRejectsInvalidWorkspaceContext(t *testing.T) {
+	runner := Runner{}
+	for _, workspace := range []WorkspaceContext{
+		{Name: "example", Transition: "start", ServerURL: "https://zaw.example"},
+		{ID: "workspace-1", Transition: "start", ServerURL: "https://zaw.example"},
+		{ID: "workspace-1", Name: "example", Transition: "unknown", ServerURL: "https://zaw.example"},
+		{ID: "workspace-1", Name: "example", Transition: "start"},
+	} {
+		if _, err := runner.environment(workspace); err == nil {
+			t.Fatalf("invalid Workspace context was accepted: %#v", workspace)
+		}
 	}
 }
 
@@ -83,8 +186,7 @@ output "probe" {
 	resources, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-real",
-		"create",
+		testWorkspaceContext("workspace-real", "create"),
 		&logs,
 	)
 	if err != nil {
@@ -96,8 +198,7 @@ output "probe" {
 	if _, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-real",
-		"delete",
+		testWorkspaceContext("workspace-real", "delete"),
 		&logs,
 	); err != nil {
 		t.Fatalf("destroy real Terraform configuration: %v\n%s", err, logs.String())
@@ -137,8 +238,7 @@ fi
 	resources, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-1",
-		"start",
+		testWorkspaceContext("workspace-1", "start"),
 		&logs,
 	)
 	if err != nil {
@@ -177,8 +277,7 @@ fi
 	_, err := runner.Execute(
 		context.Background(),
 		directory,
-		"workspace-timeout",
-		"start",
+		testWorkspaceContext("workspace-timeout", "start"),
 		&bytes.Buffer{},
 	)
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -221,8 +320,7 @@ fi
 		_, err := runner.Execute(
 			ctx,
 			directory,
-			"workspace-cancelled",
-			"start",
+			testWorkspaceContext("workspace-cancelled", "start"),
 			&bytes.Buffer{},
 		)
 		done <- err
@@ -261,8 +359,7 @@ fi
 	_, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-failure",
-		"start",
+		testWorkspaceContext("workspace-failure", "start"),
 		&logs,
 	)
 	if err == nil || !strings.Contains(err.Error(), "terraform plan") {
@@ -296,8 +393,7 @@ fi
 	_, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-partial",
-		"start",
+		testWorkspaceContext("workspace-partial", "start"),
 		&bytes.Buffer{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "terraform apply") {
@@ -356,8 +452,7 @@ func TestRunnerAppliesThePlanItPreviewed(t *testing.T) {
 	resources, err := runner.Execute(
 		t.Context(),
 		directory,
-		"workspace-1",
-		"start",
+		testWorkspaceContext("workspace-1", "start"),
 		&bytes.Buffer{},
 	)
 	if err != nil {
@@ -378,5 +473,50 @@ func TestRunnerAppliesThePlanItPreviewed(t *testing.T) {
 	}
 	if !strings.Contains(string(trace), wantApply) {
 		t.Fatalf("Terraform did not apply its plan file: %s", trace)
+	}
+}
+
+func TestRunnerAppliesSavedDestroyPlan(t *testing.T) {
+	directory := t.TempDir()
+	tracePath := filepath.Join(directory, "terraform.trace")
+	binaryPath := writeFakeTerraform(t, directory, `
+printf '%s\n' "$*" >> "$ZAW_TERRAFORM_TRACE"
+`)
+	runner := Runner{
+		Binary:      binaryPath,
+		Environment: []string{"ZAW_TERRAFORM_TRACE=" + tracePath},
+	}
+	if _, err := runner.Execute(
+		t.Context(),
+		directory,
+		testWorkspaceContext("workspace-1", "delete"),
+		&bytes.Buffer{},
+	); err != nil {
+		t.Fatalf("destroy Terraform resources: %v", err)
+	}
+	trace, err := os.ReadFile(tracePath)
+	if err != nil {
+		t.Fatalf("read Terraform trace: %v", err)
+	}
+	planPath := filepath.Join(directory, planFileName)
+	wantPlan := "plan -input=false -out=" + planPath + " -destroy"
+	wantApply := "apply -auto-approve -input=false " + planPath
+	if !strings.Contains(string(trace), wantPlan) {
+		t.Fatalf("Terraform did not save a destroy plan: %s", trace)
+	}
+	if !strings.Contains(string(trace), wantApply) {
+		t.Fatalf("Terraform did not apply its destroy plan: %s", trace)
+	}
+	if strings.Contains(string(trace), "destroy -auto-approve") {
+		t.Fatalf("Terraform bypassed the saved destroy plan: %s", trace)
+	}
+}
+
+func testWorkspaceContext(id string, transition string) WorkspaceContext {
+	return WorkspaceContext{
+		ID:         id,
+		Name:       id,
+		Transition: transition,
+		ServerURL:  "https://zaw.example",
 	}
 }

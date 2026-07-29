@@ -4,8 +4,41 @@ import type { ITerminalService } from "../terminal/terminal-service";
 import type { IWorkspaceResourceService } from "../workspace/workspace-resource-service";
 import type { IChatSessionService } from "../../services/chat-session";
 import type { IWorkspaceAttachmentService } from "../../services/workspace-attachment";
+import type { ISessionTodoService } from "../../services/session-todos";
 
 describe("AHPProjectionService", () => {
+  it("projects session todo metadata without appending a chat event", () => {
+    const replaceFromMeta = vi.fn();
+    const appendEvent = vi.fn();
+    const projection = new AHPProjectionService(
+      { appendOutput: vi.fn() } as unknown as ITerminalService,
+      { replaceChanges: vi.fn() } as unknown as IWorkspaceResourceService,
+      { appendEvent } as unknown as IChatSessionService,
+      { attached: vi.fn() } as unknown as IWorkspaceAttachmentService,
+      { replaceFromMeta } as unknown as ISessionTodoService,
+    );
+
+    projection.project("workspace-one", {
+      action: {
+        type: "session/metaChanged",
+        _meta: {
+          zaw_todos: {
+            version: 1,
+            items: [{ id: "one", title: "Implement", status: "in_progress" }],
+          },
+        },
+      },
+      channel: "ahp-session:/one",
+      serverSeq: 2,
+    });
+
+    expect(replaceFromMeta).toHaveBeenCalledWith(
+      { resource: "ahp-session:/one", workspaceID: "workspace-one" },
+      expect.objectContaining({ zaw_todos: expect.any(Object) }),
+    );
+    expect(appendEvent).not.toHaveBeenCalled();
+  });
+
   it("projects a chat delta into the session identified by the attached host", () => {
     const terminals = { appendOutput: vi.fn() } as unknown as ITerminalService;
     const resources = {

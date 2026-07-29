@@ -10,6 +10,9 @@ Install Go, Node.js, pnpm, Terraform, and Task directly on the host; project
 compilation does not use Docker. Exact versions and the clean-environment workflow
 are documented in [Local development](docs/development.md). Run `task fmt`,
 `task lint`, `task test`, and `task build` before submitting a change.
+Run `zaw version` to inspect the application and bundled Terraform Provider
+version. Release steps and artifacts are documented in
+[Releasing Zaw](docs/releasing.md).
 
 The Server loads `.env` automatically (copy `.env.example`) and supports GORM with
 either MySQL or SQLite. Set `ZAW_DATABASE_DRIVER=mysql` with a MySQL DSN for the
@@ -23,11 +26,13 @@ Provisioner registration, polling, and build reporting.
 
 The local Provisioner stores Terraform state under `ZAW_TERRAFORM_STATE_DIR`,
 with one state file per Workspace. Keep this directory persistent and back it up
-with the control-plane database.
+with the control-plane database. It exposes the `zaw` executable as a bundled
+Terraform Provider through an isolated filesystem mirror; set
+`ZAW_TERRAFORM_PROVIDER_BINARY` only when using a separate Provider binary.
 The runnable Docker Terraform example is in
 [examples/templates/docker-workspace](/home/evanxiao/zaw/zaw/examples/templates/docker-workspace).
 Its persistent home volume survives a stop build; only delete destroys it.
-The template-facing Agent injection resource is documented in
+The template-facing Workspace context and Agent injection resources are documented in
 [terraform-provider-zaw.md](docs/architecture/terraform-provider-zaw.md).
 
 An Agent Host requires a Workspace ID, protected registration credential, working

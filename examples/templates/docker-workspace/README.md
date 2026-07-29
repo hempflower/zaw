@@ -16,15 +16,14 @@ such as a rootless Docker socket.
 
 ## Agent Host injection
 
-The Provisioner injects `zaw_workspace_id`, `zaw_workspace_running`, and
-`zaw_workspace_transition`. The template forwards Agent Host values as
-`ZAW_SERVER_URL`, `ZAW_WORKSPACE_ID`, `ZAW_WORKSPACE_DIR`, and
-`ZAW_AGENT_PROVIDER` and `ZAW_COPILOT_CLI_PATH`. Supply `zaw_agent_command` only
-in an image that already contains the `zaw` binary and GitHub Copilot CLI:
+The Provisioner injects trusted `ZAW_WORKSPACE_*` context into the bundled Zaw
+Terraform Provider. The template reads `data.zaw_workspace.current` and
+forwards values as `ZAW_SERVER_URL`, `ZAW_WORKSPACE_ID`, `ZAW_WORKSPACE_DIR`,
+`ZAW_AGENT_PROVIDER` and `ZAW_COPILOT_CLI_PATH`. Supply `zaw_agent_command`
+only in an image that already contains the `zaw` binary and GitHub Copilot CLI:
 
 ```hcl
 zaw_agent_command    = "zaw agent-host"
-zaw_server_url       = "ws://control-plane.internal:8080"
 zaw_agent_provider   = "copilot"
 zaw_copilot_cli_path = "/usr/local/bin/copilot"
 ```

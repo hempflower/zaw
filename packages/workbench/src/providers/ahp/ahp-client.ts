@@ -364,12 +364,21 @@ export class AHPClient {
   private async subscribeSession(resource: string): Promise<string> {
     const result = (await this.request("subscribe", { channel: resource })) as {
       snapshot?: {
+        fromSeq?: number;
         state?: {
           changesets?: unknown[];
           defaultChat?: string;
+          _meta?: Record<string, unknown>;
         };
       };
     };
+    if (result.snapshot?.state) {
+      this.emitAction({
+        channel: resource,
+        action: { type: "session/snapshot", state: result.snapshot.state },
+        serverSeq: result.snapshot.fromSeq ?? 0,
+      });
+    }
     const chat = result.snapshot?.state?.defaultChat;
     if (!chat)
       throw new Error("Agent Host did not provide a default Chat channel");

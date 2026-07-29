@@ -22,6 +22,23 @@ func TestWorkspaceLifecycle(t *testing.T) {
 	if _, err := service.NextDesiredState(current, domainworkspace.Start); err == nil {
 		t.Fatal("start running workspace was accepted")
 	}
+	stopped := domainworkspace.Workspace{
+		DesiredState:  domainworkspace.DesiredStopped,
+		ObservedState: domainworkspace.ObservedStopped,
+	}
+	for _, operation := range []domainworkspace.BuildOperation{
+		domainworkspace.Reconfigure,
+		domainworkspace.RebuildFromCurrentTemplate,
+		domainworkspace.Repair,
+	} {
+		next, err := service.NextDesiredState(stopped, operation)
+		if err != nil {
+			t.Fatalf("%s stopped Workspace: %v", operation, err)
+		}
+		if next != domainworkspace.DesiredRunning {
+			t.Fatalf("%s desired state = %q", operation, next)
+		}
+	}
 
 	tests := []struct {
 		operation domainworkspace.BuildOperation

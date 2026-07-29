@@ -40,7 +40,30 @@ func TestMySQLMigrationAndRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open MySQL: %v", err)
 	}
+	verifyConcurrentMigrations(t, database)
 	verifyDatabaseBehavior(t, database)
+}
+
+func verifyConcurrentMigrations(t *testing.T, database *gorm.DB) {
+	t.Helper()
+	const workers = 2
+	start := make(chan struct{})
+	results := make(chan error, workers)
+	for range workers {
+		go func() {
+			<-start
+			results <- Migrate(database)
+		}()
+	}
+	close(start)
+	for range workers {
+		if err := <-results; err != nil {
+			t.Fatalf("concurrent migration: %v", err)
+		}
+	}
+	if database.Migrator().HasTable("null_int64") {
+		t.Fatal("migration lock query leaked its scan destination into the schema")
+	}
 }
 
 func verifyDatabaseBehavior(t *testing.T, database *gorm.DB) {

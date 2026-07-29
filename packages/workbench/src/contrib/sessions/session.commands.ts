@@ -154,12 +154,12 @@ export function registerSessionCommands(
     commands.registerCommand<[ComposerActionContext, string]>(
       "zaw.composer.selectMode",
       (_accessor, context, value) =>
-        context.selectMode(value as "agent" | "ask" | "plan"),
+        context.selectMode(value as "agent" | "ask"),
       {
         category: "Chat",
         validate: (context, value) =>
           isComposerActionContext(context) &&
-          (value === "agent" || value === "ask" || value === "plan"),
+          (value === "agent" || value === "ask"),
       },
     ),
     commands.registerCommand<[ComposerActionContext, string]>(

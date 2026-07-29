@@ -131,8 +131,9 @@ describe("DropdownWidget", () => {
     const summary = root.querySelector("summary")!;
     summary.getBoundingClientRect = () =>
       ({ bottom: 410, top: 380 }) as DOMRect;
-    root.querySelector<HTMLElement>(".zaw-dropdown-panel")!.getBoundingClientRect =
-      () => ({ height: 90 }) as DOMRect;
+    root.querySelector<HTMLElement>(
+      ".zaw-dropdown-panel",
+    )!.getBoundingClientRect = () => ({ height: 90 }) as DOMRect;
 
     const details = root.querySelector("details")!;
     details.open = true;

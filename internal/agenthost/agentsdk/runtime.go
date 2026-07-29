@@ -38,8 +38,18 @@ type SessionOptions struct {
 	ID               string
 	WorkingDirectory string
 	Model            string
+	Instructions     string
 	OnEvent          func(Event)
 	OnPermission     func(context.Context, PermissionRequest) PermissionDecision
+	Tools            []Tool
+}
+
+type Tool struct {
+	Name           string
+	Description    string
+	Parameters     map[string]any
+	SkipPermission bool
+	Handler        func(context.Context, any) (string, error)
 }
 
 type Event struct {

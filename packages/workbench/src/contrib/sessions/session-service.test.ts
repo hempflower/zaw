@@ -141,4 +141,30 @@ describe("SessionService", () => {
     });
     expect(chat.composition(identity).attachments).toEqual([]);
   });
+
+  it("does not send a stale hidden Plan mode", async () => {
+    const host = { promptSession: vi.fn().mockResolvedValue(undefined) };
+    const attachment = {
+      attached: vi.fn().mockReturnValue(host),
+    } as unknown as IWorkspaceAttachmentService;
+    const identity = {
+      workspaceID: "workspace-one",
+      resource: "ahp-session:/one",
+    };
+    const chat = new ChatSessionService();
+    chat.update(identity, { draft: "continue", mode: "plan" });
+    const service = new SessionService(
+      attachment,
+      chat,
+      new ActiveSessionService(),
+      { add: vi.fn() } as unknown as ISessionCatalogService,
+    );
+
+    await service.send(identity);
+
+    expect(host.promptSession).toHaveBeenCalledWith(
+      identity.resource,
+      expect.objectContaining({ mode: "agent" }),
+    );
+  });
 });

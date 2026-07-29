@@ -107,6 +107,19 @@ describe("ChatSessionService", () => {
     expect(restored.draft).toBe("Use the context");
   });
 
+  it("restores legacy Plan compositions as Agent mode", () => {
+    const value = JSON.stringify({ mode: "plan", draft: "legacy plan" });
+    const storage = {
+      getItem: () => value,
+      setItem: () => undefined,
+    } as unknown as Storage;
+    const identity = { workspaceID: "one", resource: "ahp-session:/one" };
+
+    expect(new ChatSessionService(storage).composition(identity).mode).toBe(
+      "agent",
+    );
+  });
+
   it("updates turn and approval context keys only for the active session", () => {
     const context = new ContextKeyService();
     const active = new ActiveSessionService(context);

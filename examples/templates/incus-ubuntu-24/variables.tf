@@ -1,30 +1,3 @@
-variable "workspace_id" {
-  type        = string
-  description = "The immutable Zaw Workspace identifier."
-}
-
-variable "zaw_workspace_id" {
-  type        = string
-  description = "The immutable Zaw Workspace identifier injected by the Provisioner."
-}
-
-variable "zaw_workspace_running" {
-  type        = bool
-  description = "Whether the existing VM should be running; delete uses Terraform destroy."
-  default     = true
-}
-
-variable "zaw_workspace_transition" {
-  type        = string
-  description = "The control-plane operation currently being applied."
-  default     = "create"
-}
-
-variable "zaw_server_url" {
-  type        = string
-  description = "Control-plane URL reachable from the Incus VM."
-}
-
 variable "zaw_agent_provider" {
   type        = string
   description = "Agent SDK provider used inside the VM."

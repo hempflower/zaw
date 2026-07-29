@@ -17,7 +17,9 @@ import (
 // number, so its maximum safe integer is the closest compatible no-limit value.
 const unlimitedAutopilotContinues = "9007199254740991"
 
-const autopilotContinuationPrompt = "You have not yet marked the task as complete using the task_complete tool. If you were planning, stop planning and start implementing. You aren't done until you have fully completed the task."
+const autopilotContinuationPrompt = "You have not yet marked the task as complete using the " +
+	"task_complete tool. If you were planning, stop planning and start implementing. " +
+	"You aren't done until you have fully completed the task."
 
 type Config struct {
 	CLIPath          string
@@ -134,6 +136,34 @@ func (r *Runtime) CreateSession(
 		model = r.model
 	}
 	wrapped := &copilotSession{model: model, onEvent: options.OnEvent}
+	tools := make([]copilotsdk.Tool, 0, len(options.Tools))
+	for _, tool := range options.Tools {
+		tool := tool
+		tools = append(tools, copilotsdk.Tool{
+			Name:           tool.Name,
+			Description:    tool.Description,
+			Parameters:     tool.Parameters,
+			SkipPermission: tool.SkipPermission,
+			Defer:          copilotsdk.ToolDeferNever,
+			Handler: func(invocation copilotsdk.ToolInvocation) (copilotsdk.ToolResult, error) {
+				result, err := tool.Handler(invocation.TraceContext, invocation.Arguments)
+				if err != nil {
+					return copilotsdk.ToolResult{}, err
+				}
+				return copilotsdk.ToolResult{
+					TextResultForLLM: result,
+					ResultType:       "success",
+				}, nil
+			},
+		})
+	}
+	var systemMessage *copilotsdk.SystemMessageConfig
+	if options.Instructions != "" {
+		systemMessage = &copilotsdk.SystemMessageConfig{
+			Mode:    "append",
+			Content: options.Instructions,
+		}
+	}
 	session, err := r.client.CreateSession(ctx, &copilotsdk.SessionConfig{
 		SessionID:        options.ID,
 		ClientName:       "zaw-agent-host",
@@ -142,6 +172,8 @@ func (r *Runtime) CreateSession(
 		WorkingDirectory: options.WorkingDirectory,
 		Streaming:        &streaming,
 		Provider:         &r.provider,
+		Tools:            tools,
+		SystemMessage:    systemMessage,
 		OnEvent: func(event copilotsdk.SessionEvent) {
 			wrapped.handleEvent(event)
 		},

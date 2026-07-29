@@ -108,6 +108,7 @@ func (s *Server) claimJob(w http.ResponseWriter, r *http.Request) {
 	}
 	var job storage.ProvisionerJob
 	var build storage.WorkspaceBuild
+	var workspace storage.Workspace
 	err := s.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("status = ?", "queued").Order("created_at").First(&job).Error; err != nil {
 			return err
@@ -127,6 +128,9 @@ func (s *Server) claimJob(w http.ResponseWriter, r *http.Request) {
 			return gorm.ErrRecordNotFound
 		}
 		if err := tx.Where("id = ?", job.BuildID).First(&build).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", build.WorkspaceID).First(&workspace).Error; err != nil {
 			return err
 		}
 		result = tx.Model(&build).Updates(map[string]any{
@@ -150,7 +154,13 @@ func (s *Server) claimJob(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, err.Error())
 		return
 	}
-	respond(w, 200, map[string]any{"id": job.ID, "build": build})
+	respond(w, 200, map[string]any{
+		"id": job.ID,
+		"build": struct {
+			storage.WorkspaceBuild
+			WorkspaceName string
+		}{WorkspaceBuild: build, WorkspaceName: workspace.Name},
+	})
 }
 
 type jobEventInput struct {

@@ -18,12 +18,14 @@ Zaw 是面向远程、隔离开发环境的 AI Agent 工作台。Workspace 是 A
 
 ## 进程角色
 
-同一个 Go 二进制以三个角色运行：
+同一个 Go 二进制以四个角色运行，其中 Terraform Provider 角色通常由
+Provisioner 通过本地 mirror 自动启动：
 
 ```text
 zaw server
 zaw provisioner
 zaw agent-host
+zaw terraform-provider
 ```
 
 ```text

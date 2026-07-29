@@ -89,7 +89,7 @@ export class SessionService implements ISessionService {
       approvalMode: composition.approvalMode,
       attachments: composition.attachments,
       model: composition.model,
-      mode: composition.mode ?? "agent",
+      mode: composition.mode === "ask" ? "ask" : "agent",
       reasoningEffort: composition.reasoningEffort,
       text: composition.draft,
     });

@@ -1,9 +1,35 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from "vitest";
-import { ComposerPersistentLane, InterruptionLane } from "./chat-input-lanes";
+import {
+  ComposerPersistentLane,
+  InterruptionLane,
+  SessionTodoList,
+} from "./chat-input-lanes";
 
 describe("chat input lanes", () => {
+  it("renders a collapsible session plan directly above the composer", () => {
+    const plan = new SessionTodoList();
+    plan.update([
+      { id: "one", status: "completed", title: "Inspect protocol" },
+      { id: "two", status: "in_progress", title: "Render todos" },
+    ]);
+
+    expect(plan.element.hidden).toBe(false);
+    expect(plan.element.textContent).toContain("Plan (1/2)");
+    expect(plan.element.querySelectorAll('[role="listitem"]')).toHaveLength(2);
+
+    plan.element.querySelector<HTMLButtonElement>("button")?.click();
+    expect(
+      plan.element.querySelector<HTMLElement>(".agent-composer-todos-list")
+        ?.hidden,
+    ).toBe(true);
+
+    plan.update([]);
+    expect(plan.element.hidden).toBe(true);
+    plan.dispose();
+  });
+
   it("updates notifications without replacing the persistent lane or item", () => {
     const lane = new ComposerPersistentLane();
     lane.update([{ kind: "notification", level: "info", text: "Connecting" }]);

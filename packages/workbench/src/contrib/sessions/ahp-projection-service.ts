@@ -1,9 +1,10 @@
-import { inject, injectable } from "inversify";
+import { inject, injectable, optional } from "inversify";
 import type { AHPAction } from "../../services/agent-host";
 import type { SessionIdentity } from "../../services/active-session";
 import type { ChatEvent } from "../../services/chat-events";
 import { IChatSessionService } from "../../services/chat-session";
 import { IWorkspaceAttachmentService } from "../../services/workspace-attachment";
+import { ISessionTodoService } from "../../services/session-todos";
 import { IWorkspaceResourceService } from "../workspace/workspace-resource-service";
 import { ITerminalService } from "../terminal/terminal-service";
 import type { WorkspaceChange } from "../workspace/workspace-resource-service";
@@ -26,8 +27,26 @@ export class AHPProjectionService implements IAHPProjectionService {
     @inject(IChatSessionService) private readonly chat: IChatSessionService,
     @inject(IWorkspaceAttachmentService)
     private readonly attachments: IWorkspaceAttachmentService,
+    @optional()
+    @inject(ISessionTodoService)
+    private readonly todos?: ISessionTodoService,
   ) {}
   project(workspaceID: string, action: AHPAction): void {
+    if (action.action.type === "session/snapshot") {
+      const state = recordValue(action.action.state);
+      this.todos?.replaceFromMeta(
+        { workspaceID, resource: action.channel },
+        state?._meta,
+      );
+      return;
+    }
+    if (action.action.type === "session/metaChanged") {
+      this.todos?.replaceFromMeta(
+        { workspaceID, resource: action.channel },
+        action.action._meta,
+      );
+      return;
+    }
     if (
       action.action.type === "terminal/data" &&
       typeof action.action.data === "string"

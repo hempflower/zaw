@@ -23,6 +23,7 @@ type Config struct {
 	Name                        string
 	WorkRoot                    string
 	TerraformBinary             string
+	TerraformProviderBinary     string
 	DockerHost                  string
 	IncusBinary                 string
 	StateDirectory              string
@@ -50,6 +51,7 @@ type sourceSnapshot struct {
 type buildPayload struct {
 	ID                string          `json:"ID"`
 	WorkspaceID       string          `json:"WorkspaceID"`
+	WorkspaceName     string          `json:"WorkspaceName"`
 	Operation         string          `json:"Operation"`
 	SourceSnapshot    json.RawMessage `json:"SourceSnapshot"`
 	ParameterSnapshot json.RawMessage `json:"ParameterSnapshot"`
@@ -136,6 +138,28 @@ func New(config Config) (*Worker, error) {
 	if config.DockerHost != "" {
 		terraformEnvironment = append(terraformEnvironment, "DOCKER_HOST="+config.DockerHost)
 	}
+	providerBinary := config.TerraformProviderBinary
+	if providerBinary == "" {
+		providerBinary = os.Getenv("ZAW_TERRAFORM_PROVIDER_BINARY")
+	}
+	if providerBinary == "" {
+		var locateErr error
+		providerBinary, locateErr = os.Executable()
+		if locateErr != nil {
+			return nil, fmt.Errorf("locate bundled Terraform Provider: %w", locateErr)
+		}
+	}
+	terraformCLIConfig, err := terraformrunner.InstallBundledProvider(
+		config.WorkRoot,
+		providerBinary,
+	)
+	if err != nil {
+		return nil, err
+	}
+	terraformEnvironment = append(
+		terraformEnvironment,
+		"TF_CLI_CONFIG_FILE="+terraformCLIConfig,
+	)
 	return &Worker{
 		config: config,
 		client: &http.Client{Timeout: 30 * time.Second},
@@ -291,14 +315,18 @@ func (w *Worker) executeBuild(
 	if err != nil {
 		return nil, err
 	}
-	if err := writeWorkspaceVariables(templateDirectory, job.Build, w.config.ServerURL); err != nil {
+	if err := writeWorkspaceVariables(templateDirectory, job.Build); err != nil {
 		return nil, err
 	}
 	resources, err := w.runner.Execute(
 		ctx,
 		templateDirectory,
-		job.Build.WorkspaceID,
-		job.Build.Operation,
+		terraformrunner.WorkspaceContext{
+			ID:         job.Build.WorkspaceID,
+			Name:       job.Build.WorkspaceName,
+			Transition: job.Build.Operation,
+			ServerURL:  w.config.ServerURL,
+		},
 		logs,
 	)
 	if err != nil {
@@ -422,7 +450,6 @@ func runRedactedCommand(
 func writeWorkspaceVariables(
 	templateDirectory string,
 	build buildPayload,
-	serverURL string,
 ) error {
 	parameters := map[string]any{}
 	if len(build.ParameterSnapshot) > 0 {
@@ -430,11 +457,15 @@ func writeWorkspaceVariables(
 			return fmt.Errorf("decode parameter snapshot: %w", err)
 		}
 	}
-	parameters["workspace_id"] = build.WorkspaceID
-	parameters["zaw_workspace_id"] = build.WorkspaceID
-	parameters["zaw_workspace_transition"] = build.Operation
-	parameters["zaw_workspace_running"] = workspaceRunning(build.Operation)
-	parameters["zaw_server_url"] = serverURL
+	for _, name := range []string{
+		"workspace_id",
+		"zaw_workspace_id",
+		"zaw_workspace_running",
+		"zaw_workspace_transition",
+		"zaw_server_url",
+	} {
+		delete(parameters, name)
+	}
 	payload, err := json.Marshal(parameters)
 	if err != nil {
 		return fmt.Errorf("encode workspace variables: %w", err)
@@ -444,13 +475,6 @@ func writeWorkspaceVariables(
 		return fmt.Errorf("write workspace variables: %w", err)
 	}
 	return nil
-}
-
-func workspaceRunning(operation string) bool {
-	if operation == "stop" || operation == "delete" {
-		return false
-	}
-	return true
 }
 
 type gitCredential struct {
