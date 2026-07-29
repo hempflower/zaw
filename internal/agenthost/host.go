@@ -758,6 +758,8 @@ func (h *Host) createSession(request rpcRequest) ([]byte, []byte) {
 		agentsdk.SessionOptions{
 			ID:               strings.TrimPrefix(params.Channel, "ahp-session:/"),
 			WorkingDirectory: h.workDir,
+			Instructions:     todoInstructions,
+			Tools:            []agentsdk.Tool{h.todoTool(params.Channel)},
 			OnEvent: func(event agentsdk.Event) {
 				h.handleAgentEvent(params.Channel, chatResource, event)
 			},

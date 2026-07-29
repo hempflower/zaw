@@ -219,10 +219,7 @@ export class ChatSessionService
           : [],
         draft: typeof restored.draft === "string" ? restored.draft : "",
         model: typeof restored.model === "string" ? restored.model : "",
-        mode:
-          restored.mode === "ask" || restored.mode === "plan"
-            ? restored.mode
-            : "agent",
+        mode: restored.mode === "ask" ? "ask" : "agent",
         reasoningEffort:
           typeof restored.reasoningEffort === "string"
             ? restored.reasoningEffort

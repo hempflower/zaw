@@ -79,7 +79,8 @@ func TestPromptRequestUsesExplicitPlanMode(t *testing.T) {
 }
 
 func TestHostCreatesSessionWithoutPersistentStorage(t *testing.T) {
-	host := NewWithAgent(&testAgentRuntime{}, "")
+	runtime := &testAgentRuntime{}
+	host := NewWithAgent(runtime, "")
 	response, notification := host.handle([]byte(`{
       "jsonrpc":"2.0",
       "id":1,
@@ -108,14 +109,23 @@ func TestHostCreatesSessionWithoutPersistentStorage(t *testing.T) {
 	if len(envelope.Result.Items) != 1 {
 		t.Fatalf("expected one in-memory session, got %d", len(envelope.Result.Items))
 	}
+	if runtime.options.Instructions != todoInstructions {
+		t.Fatalf("todo instructions were not passed to the agent SDK")
+	}
+	if len(runtime.options.Tools) != 1 || runtime.options.Tools[0].Name != "zaw_update_todos" {
+		t.Fatalf("todo tool was not passed to the agent SDK: %#v", runtime.options.Tools)
+	}
 }
 
-type testAgentRuntime struct{}
+type testAgentRuntime struct {
+	options agentsdk.SessionOptions
+}
 
 func (r *testAgentRuntime) CreateSession(
 	_ context.Context,
 	options agentsdk.SessionOptions,
 ) (agentsdk.Session, error) {
+	r.options = options
 	return &testAgentSession{id: options.ID}, nil
 }
 

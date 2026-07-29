@@ -601,6 +601,98 @@
   padding: 4px 32px 12px;
 }
 
+.agent-composer-todos {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--zaw-agents-panel-foreground);
+  background: var(--zaw-agents-chat-input-background);
+  border: 1px solid var(--zaw-agents-panel-border);
+  border-radius: var(--zaw-corner-radius-medium);
+}
+
+.agent-composer-todos[hidden] {
+  display: none;
+}
+
+.agent-composer-todos-header {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 28px;
+  gap: 5px;
+  align-items: center;
+  padding: 0 8px;
+  color: inherit;
+  font: inherit;
+  font-size: var(--zaw-agents-font-size-label1);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.agent-composer-todos-header:hover {
+  background: var(--zaw-list-hover-background);
+}
+
+.agent-composer-todos-header:focus-visible {
+  outline: 1px solid var(--zaw-focus-border);
+  outline-offset: -1px;
+}
+
+.agent-composer-todos-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-composer-todos-list {
+  max-height: 154px;
+  overflow: auto;
+}
+
+.agent-composer-todos-list-content {
+  padding: 2px 0 5px;
+}
+
+.agent-composer-todos-list[hidden] {
+  display: none;
+}
+
+.agent-composer-todo {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 22px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  padding: 1px 8px;
+  font-size: var(--zaw-agents-font-size-body1);
+}
+
+.agent-composer-todo-status {
+  color: var(--zaw-description);
+  font-size: var(--zaw-codicon-font-size-compact);
+  text-align: center;
+}
+
+.agent-composer-todo[data-status="in_progress"] .agent-composer-todo-status {
+  color: var(--vscode-charts-blue);
+}
+
+.agent-composer-todo[data-status="completed"] {
+  color: var(--zaw-description);
+}
+
+.agent-composer-todo[data-status="completed"] .agent-composer-todo-status {
+  color: var(--vscode-charts-green);
+}
+
+.agent-composer-todo-title {
+  overflow-wrap: anywhere;
+}
+
 @container (max-width: 330px) {
   .agent-composer-picker-host:not(.agent-permission-picker)
     .zaw-picker-action-label {

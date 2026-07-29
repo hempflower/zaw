@@ -157,6 +157,30 @@ describe("AgentComposer", () => {
     ]);
   });
 
+  it("hides Plan mode and presents stale Plan compositions as Agent", () => {
+    const composition = { ...state(), mode: "plan" as const };
+    const composer = new AgentComposer({
+      ariaLabel: "Prompt",
+      composition: () => composition,
+      models: () => [],
+      onChange: (changes) => Object.assign(composition, changes),
+      onSubmit: () => undefined,
+      placeholder: () => "Prompt",
+    });
+
+    const modePicker = composer.element.querySelector(".agent-mode-picker");
+    expect(
+      Array.from(
+        modePicker?.querySelectorAll<HTMLButtonElement>(".zaw-dropdown-item") ??
+          [],
+        (item) => item.value,
+      ),
+    ).toEqual(["agent", "ask"]);
+    expect(
+      modePicker?.querySelector(".zaw-picker-action-label")?.textContent,
+    ).toBe("Agent");
+  });
+
   it("shows and clears the file drop overlay from real drag state", () => {
     const composition = state();
     const composer = new AgentComposer({

@@ -4,6 +4,7 @@ import { ICommandService } from "../../platform/commands/commands";
 import { IActionRegistry } from "../../platform/actions/actions";
 import { IActiveSessionService } from "../../services/active-session";
 import { IChatSessionService } from "../../services/chat-session";
+import { ISessionTodoService } from "../../services/session-todos";
 import {
   ViewRoot,
   type IWorkbenchView,
@@ -45,6 +46,9 @@ export class SessionPane extends Disposable implements IWorkbenchView {
     @optional()
     @inject(IWorkspaceAttachmentService)
     private readonly attachments?: IWorkspaceAttachmentService,
+    @optional()
+    @inject(ISessionTodoService)
+    private readonly todos?: ISessionTodoService,
   ) {
     super();
     this.input = new NewSessionInputModel(storage);
@@ -86,6 +90,7 @@ export class SessionPane extends Disposable implements IWorkbenchView {
           () =>
             this.attachments?.attached(selected.workspaceID)?.listAgents() ??
             [],
+          this.todos,
         );
         this.activeViews.set(key, view);
         this.root.append(view.element);

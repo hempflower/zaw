@@ -94,6 +94,10 @@ import {
   ChatSessionService,
   IChatSessionService,
 } from "../services/chat-session";
+import {
+  ISessionTodoService,
+  SessionTodoService,
+} from "../services/session-todos";
 import { IManagementProvider } from "../services/management";
 import { ISessionCatalogProvider } from "../services/session-catalog";
 import {
@@ -247,6 +251,10 @@ export function createWorkbenchContainer(
   container
     .bind<IChatSessionService>(IChatSessionService)
     .to(ChatSessionService)
+    .inSingletonScope();
+  container
+    .bind<ISessionTodoService>(ISessionTodoService)
+    .to(SessionTodoService)
     .inSingletonScope();
   container
     .bind<IManagementService>(IManagementService)

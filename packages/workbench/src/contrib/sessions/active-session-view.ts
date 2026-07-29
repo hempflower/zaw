@@ -5,6 +5,7 @@ import type { ComposerAgent } from "./agent-composer";
 import type { SessionIdentity } from "../../services/active-session";
 import { sessionIdentityKey } from "../../services/active-session";
 import type { IChatSessionService } from "../../services/chat-session";
+import type { ISessionTodoService } from "../../services/session-todos";
 import type { IManagementService } from "../management/management-service";
 import type { IWorkspaceService } from "../workspace/workspace-service";
 import { isWorkspaceRunning } from "../workspace/workspace-service";
@@ -14,6 +15,7 @@ import {
   ComposerPersistentLane,
   FollowupSuggestions,
   InterruptionLane,
+  SessionTodoList,
 } from "./chat-input-lanes";
 import type { ISessionCatalogService } from "./session-catalog-service";
 import { runtimeModelID } from "./model-identity";
@@ -26,6 +28,7 @@ export class ActiveSessionView extends Disposable {
   private readonly transcript: ConversationTranscript;
   private readonly composer: ActiveSessionComposer;
   private readonly interruption: InterruptionLane;
+  private readonly todoList: SessionTodoList;
   private readonly persistent = new ComposerPersistentLane();
   private readonly followups = new FollowupSuggestions();
   private lastFocused: HTMLElement | undefined;
@@ -39,6 +42,7 @@ export class ActiveSessionView extends Disposable {
     private readonly workspaces?: IWorkspaceService,
     private readonly management?: IManagementService,
     private readonly agents: () => readonly ComposerAgent[] = () => [],
+    private readonly todos?: ISessionTodoService,
   ) {
     super();
     const renderOptions = {
@@ -52,6 +56,7 @@ export class ActiveSessionView extends Disposable {
     };
     this.transcript = this._register(new ConversationTranscript(renderOptions));
     this.interruption = this._register(new InterruptionLane(renderOptions));
+    this.todoList = this._register(new SessionTodoList());
     const composerLane = createElement("div", {
       className: "agent-active-composer-lane",
     });
@@ -101,6 +106,7 @@ export class ActiveSessionView extends Disposable {
       }),
     );
     composerLane.append(
+      this.todoList.element,
       this.persistent.element,
       this.interruption.element,
       this.composer.element,
@@ -117,6 +123,12 @@ export class ActiveSessionView extends Disposable {
         if (sessionIdentityKey(changed) === sessionIdentityKey(this.identity))
           this.refresh();
       }),
+    );
+    this._register(
+      this.todos?.onDidChange((changed) => {
+        if (sessionIdentityKey(changed) === sessionIdentityKey(this.identity))
+          this.todoList.update(this.todos?.items(this.identity) ?? []);
+      }) ?? { dispose() {} },
     );
     this._register(this.catalog.onDidChange(() => this.updateAccessibleName()));
     this._register(
@@ -170,6 +182,7 @@ export class ActiveSessionView extends Disposable {
     );
     this.persistent.update(notifications);
     this.interruption.update(pending);
+    this.todoList.update(this.todos?.items(this.identity) ?? []);
     this.composer.refresh();
     this.updateAccessibleName();
   }

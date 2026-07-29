@@ -48,7 +48,7 @@ export type AgentComposerOptions = {
 export type ComposerActionContext = {
   attach: () => void;
   selectModel: (model: string) => void;
-  selectMode: (mode: "agent" | "ask" | "plan") => void;
+  selectMode: (mode: "agent" | "ask") => void;
   selectReasoningEffort: (effort: string) => void;
   submit: () => void;
 };
@@ -255,9 +255,8 @@ export class AgentComposer extends Disposable {
         items: [
           { label: "Agent", value: "agent" },
           { label: "Ask", value: "ask" },
-          { label: "Plan", value: "plan" },
         ],
-        value: composition.mode ?? "agent",
+        value: composition.mode === "ask" ? "ask" : "agent",
       }),
     );
     this.pickerStore.add(
@@ -400,7 +399,7 @@ export class AgentComposer extends Disposable {
     else if (command === "zaw.composer.selectModel")
       context.selectModel(value ?? "");
     else if (command === "zaw.composer.selectMode")
-      context.selectMode((value as "agent" | "ask" | "plan") ?? "agent");
+      context.selectMode(value === "ask" ? "ask" : "agent");
     else if (command === "zaw.composer.selectReasoningEffort")
       context.selectReasoningEffort(value ?? "");
     else context.submit();

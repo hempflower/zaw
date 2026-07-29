@@ -176,6 +176,13 @@ func (h *Host) emitTypedAction(
 	}
 	emitters := h.subscribedEmittersLocked(channel)
 	h.mu.Unlock()
+	h.emitActionEnvelope(envelope, emitters)
+}
+
+func (h *Host) emitActionEnvelope(
+	envelope ahptypes.ActionEnvelope,
+	emitters []func([]byte),
+) {
 	payload, err := json.Marshal(ahptypes.JsonRpcNotification{
 		JsonRpc: ahptypes.JsonRpcV2,
 		Method:  "action",
@@ -187,6 +194,41 @@ func (h *Host) emitTypedAction(
 	for _, emit := range emitters {
 		emit(payload)
 	}
+}
+
+func (h *Host) updateSessionMeta(
+	channel ahptypes.URI,
+	update func(map[string]json.RawMessage) error,
+) error {
+	h.mu.Lock()
+	entry, ok := h.sessions[string(channel)]
+	if !ok {
+		h.mu.Unlock()
+		return fmt.Errorf("session %q was not found", channel)
+	}
+	meta := make(map[string]json.RawMessage, len(entry.State.Meta)+1)
+	for key, value := range entry.State.Meta {
+		meta[key] = value
+	}
+	if err := update(meta); err != nil {
+		h.mu.Unlock()
+		return err
+	}
+	action := ahptypes.StateAction{Value: &ahptypes.SessionMetaChangedAction{
+		Type: ahptypes.ActionTypeSessionMetaChanged,
+		Meta: meta,
+	}}
+	h.applyActionLocked(channel, action)
+	h.sequence++
+	envelope := ahptypes.ActionEnvelope{
+		Channel:   channel,
+		Action:    action,
+		ServerSeq: h.sequence,
+	}
+	emitters := h.subscribedEmittersLocked(channel)
+	h.mu.Unlock()
+	h.emitActionEnvelope(envelope, emitters)
+	return nil
 }
 
 func (h *Host) subscribedEmittersLocked(channel ahptypes.URI) []func([]byte) {
@@ -460,6 +502,9 @@ func (h *Host) emitToolStarted(
 	event agentsdk.Event,
 ) {
 	data := agentEventMap(event.Data)
+	if agentEventString(data, "toolName", "name", "title") == "zaw_update_todos" {
+		return
+	}
 	toolCallID := agentEventString(data, "toolCallId", "id")
 	if toolCallID == "" || h.hasToolCall(chat, toolCallID) {
 		return
@@ -503,6 +548,9 @@ func (h *Host) emitToolCompleted(
 	event agentsdk.Event,
 ) {
 	data := agentEventMap(event.Data)
+	if agentEventString(data, "toolName", "name", "title") == "zaw_update_todos" {
+		return
+	}
 	toolCallID := agentEventString(data, "toolCallId", "id")
 	if toolCallID == "" {
 		return
