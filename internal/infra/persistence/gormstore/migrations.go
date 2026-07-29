@@ -1,10 +1,16 @@
 package gormstore
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 
 	"gorm.io/gorm"
+)
+
+const (
+	mysqlMigrationLockName           = "zaw_schema_migrations"
+	mysqlMigrationLockTimeoutSeconds = 60
 )
 
 type SchemaMigration struct {
@@ -65,6 +71,39 @@ var migrations = []migration{
 }
 
 func Migrate(db *gorm.DB) error {
+	if db.Dialector.Name() != "mysql" {
+		return migrate(db)
+	}
+	return db.Connection(func(connection *gorm.DB) (err error) {
+		var acquired sql.NullInt64
+		if err := connection.Raw(
+			"SELECT GET_LOCK(?, ?)",
+			mysqlMigrationLockName,
+			mysqlMigrationLockTimeoutSeconds,
+		).Scan(&acquired).Error; err != nil {
+			return fmt.Errorf("acquire MySQL migration lock: %w", err)
+		}
+		if !acquired.Valid || acquired.Int64 != 1 {
+			return fmt.Errorf("acquire MySQL migration lock: timed out")
+		}
+		defer func() {
+			var released sql.NullInt64
+			releaseErr := connection.Raw(
+				"SELECT RELEASE_LOCK(?)",
+				mysqlMigrationLockName,
+			).Scan(&released).Error
+			if err == nil && releaseErr != nil {
+				err = fmt.Errorf("release MySQL migration lock: %w", releaseErr)
+			}
+			if err == nil && (!released.Valid || released.Int64 != 1) {
+				err = fmt.Errorf("release MySQL migration lock: lock was not held")
+			}
+		}()
+		return migrate(connection)
+	})
+}
+
+func migrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(&SchemaMigration{}); err != nil {
 		return fmt.Errorf("create migration ledger: %w", err)
 	}
