@@ -54,6 +54,7 @@ func TestWorkbenchArchitectureBoundaries(t *testing.T) {
 		"providers",
 		"parts",
 		"views",
+		"widgets",
 		"styles",
 	} {
 		if info, err := fs.Stat(os.DirFS(workbenchRoot), directory); err != nil ||
